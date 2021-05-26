@@ -106,6 +106,31 @@ class DefaultFetch
         virtual void recvReqRetry();
     };
 
+    /**
+     * McachePort class for instruction fetch.
+     */
+    class McachePort : public RequestPort
+    {
+      protected:
+        /** Pointer to fetch. */
+        DefaultFetch<Impl> *fetch;
+
+      public:
+        /** Default constructor. */
+        McachePort(DefaultFetch<Impl> *_fetch, FullO3CPU<Impl>* _cpu)
+            : RequestPort(_cpu->name() + ".mcache_port", _cpu), fetch(_fetch)
+        { }
+
+      protected:
+
+        /** Timing version of receive.  Handles setting fetch to the
+         * proper status to start fetching. */
+        virtual bool recvTimingResp(PacketPtr pkt);
+
+        /** Handles doing a retry of a failed fetch. */
+        virtual void recvReqRetry();
+    };
+
     class FetchTranslation : public BaseTLB::Translation
     {
       protected:
@@ -374,6 +399,7 @@ class DefaultFetch
     TheISA::Decoder *decoder[Impl::MaxThreads];
 
     RequestPort &getInstPort() { return icachePort; }
+    RequestPort &getMetaPort() { return mcachePort; }
 
   private:
     DynInstPtr buildInst(ThreadID tid, StaticInstPtr staticInst,
@@ -535,6 +561,9 @@ class DefaultFetch
 
     /** Instruction port. Note that it has to appear after the fetch stage. */
     IcachePort icachePort;
+
+    /** Meta Port */
+    McachePort mcachePort;
 
     /** Set to true if a pipelined I-cache request should be issued. */
     bool issuePipelinedIfetch[Impl::MaxThreads];

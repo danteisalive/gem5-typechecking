@@ -174,7 +174,8 @@ class BaseCPU(ClockedObject):
 
     icache_port = RequestPort("Instruction Port")
     dcache_port = RequestPort("Data Port")
-    _cached_ports = ['icache_port', 'dcache_port']
+    mcache_port = RequestPort("Meta Port")
+    _cached_ports = ['icache_port', 'dcache_port', 'mcache_port']
 
     _cached_ports += ArchMMU.walkerPorts()
 
@@ -186,6 +187,7 @@ class BaseCPU(ClockedObject):
         _uncached_interrupt_request_ports += ["interrupts[0].int_requestor"]
 
     def createInterruptController(self):
+        print("In createInterruptController")
         self.interrupts = [ArchInterrupts() for i in range(self.numThreads)]
 
     def connectCachedPorts(self, bus):
@@ -199,12 +201,15 @@ class BaseCPU(ClockedObject):
             exec('self.%s = bus.slave' % p)
 
     def connectAllPorts(self, cached_bus, uncached_bus = None):
+        print("In connectAllPorts")
         self.connectCachedPorts(cached_bus)
         if not uncached_bus:
             uncached_bus = cached_bus
         self.connectUncachedPorts(uncached_bus)
 
-    def addPrivateSplitL1Caches(self, ic, dc, iwc = None, dwc = None):
+     def addPrivateSplitL1Caches(self, ic, dc, iwc = None, dwc = None,
+                                mc = None):
+        print("In addPrivateSplitL1Caches")
         self.icache = ic
         self.dcache = dc
         self.icache_port = ic.cpu_side
@@ -221,6 +226,14 @@ class BaseCPU(ClockedObject):
             else:
                 self._cached_ports += ArchMMU.walkerPorts()
 
+            if mc:
+                print("CPU Config: Meta Caceh is Avaiable!")
+                self.mcache = mc
+                self.mcache_port = mc.cpu_side
+                self._cached_ports += ["mcache.mem_side"]
+            else:
+                print("CPU Config: Meta Caceh is not Avaiable!")
+
             # Checker doesn't need its own tlb caches because it does
             # functional accesses only
             if self.checker != NULL:
@@ -228,8 +241,10 @@ class BaseCPU(ClockedObject):
                     for port in ArchMMU.walkerPorts() ]
 
     def addTwoLevelCacheHierarchy(self, ic, dc, l2c, iwc=None, dwc=None,
-                                  xbar=None):
-        self.addPrivateSplitL1Caches(ic, dc, iwc, dwc)
+                                  xbar=None, mc=None):
+        print("addTwoLevelCacheHierarchy")
+        assert(0)
+        self.addPrivateSplitL1Caches(ic, dc, iwc, dwc, mc)
         self.toL2Bus = xbar if xbar else L2XBar()
         self.connectCachedPorts(self.toL2Bus)
         self.l2cache = l2c

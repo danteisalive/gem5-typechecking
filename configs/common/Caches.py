@@ -80,6 +80,19 @@ class IOCache(Cache):
     size = '1kB'
     tgts_per_mshr = 12
 
+
+class MetaCache(Cache):
+    assoc = 2
+    tag_latency = 2
+    data_latency = 2
+    response_latency = 2
+    mshrs = 4
+    size = '1kB'
+    tgts_per_mshr = 20
+    is_read_only = True
+    # Writeback clean lines as well
+    writeback_clean = True
+
 class PageTableWalkerCache(Cache):
     assoc = 2
     tag_latency = 2

@@ -91,6 +91,7 @@ DefaultFetch<Impl>::DefaultFetch(O3CPU *_cpu, const DerivO3CPUParams &params)
       numThreads(params.numThreads),
       numFetchingThreads(params.smtNumFetchingThreads),
       icachePort(this, _cpu),
+      mcachePort(this, _cpu),
       finishTranslationEvent(this), fetchStats(_cpu, this)
 {
     if (numThreads > Impl::MaxThreads)
@@ -1651,6 +1652,27 @@ void
 DefaultFetch<Impl>::IcachePort::recvReqRetry()
 {
     fetch->recvReqRetry();
+}
+
+
+template<class Impl>
+bool
+DefaultFetch<Impl>::McachePort::recvTimingResp(PacketPtr pkt)
+{
+    DPRINTF(O3CPU, "Meta Cache unit received timing\n");
+    // // We shouldn't ever get a cacheable block in Modified state
+    // assert(pkt->req->isUncacheable() ||
+    //        !(pkt->cacheResponding() && !pkt->hasSharers()));
+    // fetch->processCacheCompletion(pkt);
+
+    return true;
+}
+
+template<class Impl>
+void
+DefaultFetch<Impl>::McachePort::recvReqRetry()
+{
+    DPRINTF(O3CPU, "Meta Cache unit request retry\n");
 }
 
 #endif//__CPU_O3_FETCH_IMPL_HH__

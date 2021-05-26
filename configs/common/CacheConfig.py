@@ -103,6 +103,7 @@ def config_cache(options, system):
 
         if buildEnv['TARGET_ISA'] in ['x86', 'riscv']:
             walk_cache_class = PageTableWalkerCache
+            meta_cache_class = MetaCache
 
     # Set the cache line size of the system
     system.cache_line_size = options.cacheline_size
@@ -142,6 +143,13 @@ def config_cache(options, system):
                 iwalkcache = None
                 dwalkcache = None
 
+            if meta_cache_class:
+                print("Cache Config: Meta Caceh is Avaiable!")
+                metacache = meta_cache_class()
+            else:
+                print("Cache Config: No Meta Caceh is Avaiable!")
+                metacache = None
+
             if options.memchecker:
                 dcache_mon = MemCheckerMonitor(warn_only=True)
                 dcache_real = dcache
@@ -159,9 +167,10 @@ def config_cache(options, system):
 
             # When connecting the caches, the clock is also inherited
             # from the CPU in question
+            print("1")
             system.cpu[i].addPrivateSplitL1Caches(icache, dcache,
-                                                  iwalkcache, dwalkcache)
-
+                                    iwalkcache, dwalkcache, metacache)
+            print("2")
             if options.memchecker:
                 # The mem_side ports of the caches haven't been connected yet.
                 # Make sure connectAllPorts connects the right objects.
@@ -187,7 +196,9 @@ def config_cache(options, system):
 
         system.cpu[i].createInterruptController()
         if options.l2cache:
+            print("3")
             system.cpu[i].connectAllPorts(system.tol2bus, system.membus)
+            print("4")
         elif options.external_memory_system:
             system.cpu[i].connectUncachedPorts(system.membus)
         else:
