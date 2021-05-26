@@ -79,6 +79,7 @@ AtomicSimpleCPU::AtomicSimpleCPU(const AtomicSimpleCPUParams &p)
       simulate_inst_stalls(p.simulate_inst_stalls),
       icachePort(name() + ".icache_port", this),
       dcachePort(name() + ".dcache_port", this),
+      mcachePort(name() + ".mcache_port", this),
       dcache_access(false), dcache_latency(0),
       ppCommit(nullptr)
 {

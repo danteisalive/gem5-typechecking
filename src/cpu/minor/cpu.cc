@@ -318,6 +318,12 @@ MinorCPU::getDataPort()
     return pipeline->getDataPort();
 }
 
+Port &
+MinorCPU::getMetaPort()
+{
+    return pipeline->getMetaPort();
+}
+
 Counter
 MinorCPU::totalInsts() const
 {

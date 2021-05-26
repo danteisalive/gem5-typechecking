@@ -101,6 +101,8 @@ class CheckerCPU : public BaseCPU, public ExecContext
 
     void setDcachePort(RequestPort *dcache_port);
 
+    void setMcachePort(RequestPort *mcache_port);
+
     Port &
     getDataPort() override
     {
@@ -119,6 +121,15 @@ class CheckerCPU : public BaseCPU, public ExecContext
         return *icachePort;
     }
 
+    Port &
+    getMetaPort() override
+    {
+        // the checker does not have ports on its own so return the
+        // data port of the actual CPU core
+        assert(mcachePort);
+        return *mcachePort;
+    }
+
   protected:
 
     std::vector<Process*> workload;
@@ -127,6 +138,7 @@ class CheckerCPU : public BaseCPU, public ExecContext
 
     RequestPort *icachePort;
     RequestPort *dcachePort;
+    RequestPort *mcachePort;
 
     ThreadContext *tc;
 

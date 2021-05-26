@@ -121,6 +121,12 @@ CheckerCPU::setDcachePort(RequestPort *dcache_port)
 }
 
 void
+CheckerCPU::setMcachePort(RequestPort *mcache_port)
+{
+    mcachePort = mcache_port;
+}
+
+void
 CheckerCPU::serialize(std::ostream &os) const
 {
 }

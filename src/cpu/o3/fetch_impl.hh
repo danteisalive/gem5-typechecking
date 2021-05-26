@@ -456,6 +456,7 @@ void
 DefaultFetch<Impl>::takeOverFrom()
 {
     assert(cpu->getInstPort().isConnected());
+    assert(cpu->getMetaPort().isConnected());
     resetStage();
 
 }

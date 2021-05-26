@@ -209,6 +209,46 @@ class TraceCPU : public BaseCPU
   protected:
 
     /**
+     * McachePort class that interfaces with Meta Cache.
+     */
+    class McachePort : public RequestPort
+    {
+      public:
+        /** Default constructor. */
+        McachePort(TraceCPU* _cpu) :
+            RequestPort(_cpu->name() + ".mcache_port", _cpu), owner(_cpu)
+        {}
+
+      public:
+        /**
+         * Receive the timing reponse and simply delete the packet since
+         * instruction fetch requests are issued as per the timing in the trace
+         * and responses are ignored.
+         *
+         * @param pkt Pointer to packet received
+         * @return true
+         */
+        bool recvTimingResp(PacketPtr pkt) {panic("Not implemented!\n");}
+
+        /**
+         * Required functionally but do nothing.
+         *
+         * @param pkt Pointer to packet received
+         */
+        void recvTimingSnoopReq(PacketPtr pkt) {panic("Not implemented!\n");}
+
+        /**
+         * Handle a retry signalled by the cache if instruction read failed in
+         * the first attempt.
+         */
+        void recvReqRetry(){panic("Not implemented!\n");}
+
+      private:
+        TraceCPU* owner;
+    };
+
+
+    /**
      * IcachePort class that interfaces with L1 Instruction Cache.
      */
     class IcachePort : public RequestPort
@@ -306,6 +346,8 @@ class TraceCPU : public BaseCPU
 
     /** Port to connect to L1 data cache. */
     DcachePort dcachePort;
+
+    McachePort mcachePort;
 
     /** Requestor id for instruction read requests. */
     const RequestorID instRequestorID;
@@ -1122,6 +1164,9 @@ class TraceCPU : public BaseCPU
 
     /** Used to get a reference to the dcache port. */
     Port &getDataPort() { return dcachePort; }
+
+    /** Used to get a reference to the mcache port. */
+    Port &getMetaPort() { return mcachePort; }
 
 };
 #endif // __CPU_TRACE_TRACE_CPU_HH__

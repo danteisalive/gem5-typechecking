@@ -97,6 +97,7 @@ class BaseKvmCPU : public BaseCPU
 
     Port &getDataPort() override { return dataPort; }
     Port &getInstPort() override { return instPort; }
+    Port &getMetaPort() override { return metaPort; }
 
     void wakeup(ThreadID tid = 0) override;
     void activateContext(ThreadID thread_num) override;
@@ -612,6 +613,9 @@ class BaseKvmCPU : public BaseCPU
 
     /** Unused dummy port for the instruction interface */
     KVMCpuPort instPort;
+
+    /** Unused dummy port for the meta interface */
+    KVMCpuPort metaPort;
 
     /**
      * Be conservative and always synchronize the thread context on

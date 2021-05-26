@@ -191,6 +191,15 @@ class BaseCPU : public ClockedObject
      */
     virtual Port &getInstPort() = 0;
 
+    /**
+     * virtual method that returns a reference to the meta
+     * port. All  subclasses must implement this method.
+     *
+     * @return a reference to the meta port
+     */
+    virtual Port &getMetaPort() = 0;
+
+
     /** Reads this CPU's ID. */
     int cpuId() const { return _cpuId; }
 

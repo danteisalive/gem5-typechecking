@@ -80,6 +80,25 @@ class Fetch1 : public Named
         void recvReqRetry() { fetch.recvReqRetry(); }
     };
 
+    /** Exposable fetch port */
+    class McachePort : public MinorCPU::MinorCPUPort
+    {
+      protected:
+        /** My owner */
+        Fetch1 &fetch;
+
+      public:
+        McachePort(std::string name, Fetch1 &fetch_, MinorCPU &cpu) :
+            MinorCPU::MinorCPUPort(name, cpu), fetch(fetch_)
+        { }
+
+      protected:
+        bool recvTimingResp(PacketPtr pkt)
+        { assert(0); /**not implemented*/ }
+
+        void recvReqRetry() { assert(0); /** not implemented */}
+    };
+
     /** Memory access queuing.
      *
      *  A request can be submitted by pushing it onto the requests queue after
@@ -204,6 +223,8 @@ class Fetch1 : public Named
     /** IcachePort to pass to the CPU.  Fetch1 is the only module that uses
      *  it. */
     IcachePort icachePort;
+
+    McachePort mcachePort;
 
     /** Line snap size in bytes.  All fetches clip to make their ends not
      *  extend beyond this limit.  Setting this to the machine L1 cache line
@@ -393,6 +414,8 @@ class Fetch1 : public Named
   public:
     /** Returns the IcachePort owned by this Fetch1 */
     MinorCPU::MinorCPUPort &getIcachePort() { return icachePort; }
+    /** Returns the McachePort owned by this Fetch1 */
+    MinorCPU::MinorCPUPort &getMcachePort() { return mcachePort; }
 
     /** Pass on input/buffer data to the output if you can */
     void evaluate();

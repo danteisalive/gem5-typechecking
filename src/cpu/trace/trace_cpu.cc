@@ -95,6 +95,7 @@ TraceCPU::takeOverFrom(BaseCPU *oldCPU)
     // Unbind the ports of the old CPU and bind the ports of the TraceCPU.
     getInstPort().takeOverFrom(&oldCPU->getInstPort());
     getDataPort().takeOverFrom(&oldCPU->getDataPort());
+    getMetaPort().takeOverFrom(&oldCPU->getMetaPort());
 }
 
 void

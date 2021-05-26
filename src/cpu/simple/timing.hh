@@ -181,6 +181,37 @@ class TimingSimpleCPU : public BaseSimpleCPU
         EventFunctionWrapper retryRespEvent;
     };
 
+    class McachePort : public TimingCPUPort
+    {
+      public:
+
+        McachePort(TimingSimpleCPU *_cpu)
+            : TimingCPUPort(_cpu->name() + ".mcache_port", _cpu),
+              tickEvent(_cpu)
+        { }
+
+      protected:
+
+        virtual bool recvTimingResp(PacketPtr pkt)
+        {panic("not implemented\n");}
+
+        virtual void recvReqRetry()
+        {panic("not implemented\n");}
+
+        struct MTickEvent : public TickEvent
+        {
+
+            MTickEvent(TimingSimpleCPU *_cpu)
+                : TickEvent(_cpu) {}
+            void process() {panic("not implemented\n");}
+            const char *description() const
+            { return "Timing CPU mcache tick"; }
+        };
+
+        MTickEvent tickEvent;
+
+    };
+
     class IcachePort : public TimingCPUPort
     {
       public:
@@ -253,6 +284,7 @@ class TimingSimpleCPU : public BaseSimpleCPU
 
     IcachePort icachePort;
     DcachePort dcachePort;
+    McachePort mcachePort;
 
     PacketPtr ifetch_pkt;
     PacketPtr dcache_pkt;
@@ -266,6 +298,9 @@ class TimingSimpleCPU : public BaseSimpleCPU
 
     /** Return a reference to the instruction port. */
     Port &getInstPort() override { return icachePort; }
+
+    /** Return a reference to the meta port. */
+    Port &getMetaPort() override { return mcachePort; }
 
   public:
 

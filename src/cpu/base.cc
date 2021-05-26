@@ -412,6 +412,8 @@ BaseCPU::getPort(const std::string &if_name, PortID idx)
         return getDataPort();
     else if (if_name == "icache_port")
         return getInstPort();
+    else if (if_name == "mcache_port")
+        return getMetaPort();
     else
         return ClockedObject::getPort(if_name, idx);
 }
@@ -606,6 +608,7 @@ BaseCPU::takeOverFrom(BaseCPU *oldCPU)
     // we are switching to.
     getInstPort().takeOverFrom(&oldCPU->getInstPort());
     getDataPort().takeOverFrom(&oldCPU->getDataPort());
+    getMetaPort().takeOverFrom(&oldCPU->getMetaPort());
 }
 
 void

@@ -728,6 +728,13 @@ class FullO3CPU : public BaseO3CPU
         return this->iew.ldstQueue.getDataPort();
     }
 
+    /** Get the mcache port */
+    Port &
+    getMetaPort() override
+    {
+        return this->fetch.getMetaPort();
+    }
+
     struct FullO3CPUStats : public Stats::Group
     {
         FullO3CPUStats(FullO3CPU *cpu);

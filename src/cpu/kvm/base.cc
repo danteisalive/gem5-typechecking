@@ -65,6 +65,7 @@ BaseKvmCPU::BaseKvmCPU(const BaseKvmCPUParams &params)
       _status(Idle),
       dataPort(name() + ".dcache_port", this),
       instPort(name() + ".icache_port", this),
+      metaPort(name() + ".mcache_port", this),
       alwaysSyncTC(params.alwaysSyncTC),
       threadContextDirty(true),
       kvmStateDirty(false),

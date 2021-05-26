@@ -207,7 +207,7 @@ class BaseCPU(ClockedObject):
             uncached_bus = cached_bus
         self.connectUncachedPorts(uncached_bus)
 
-     def addPrivateSplitL1Caches(self, ic, dc, iwc = None, dwc = None,
+    def addPrivateSplitL1Caches(self, ic, dc, iwc = None, dwc = None,
                                 mc = None):
         print("In addPrivateSplitL1Caches")
         self.icache = ic

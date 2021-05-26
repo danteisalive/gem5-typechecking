@@ -134,6 +134,31 @@ class AtomicSimpleCPU : public BaseSimpleCPU
 
     };
 
+    class AtomicCPUMPort : public RequestPort
+    {
+
+      public:
+
+        AtomicCPUMPort(const std::string &_name, BaseSimpleCPU* _cpu)
+            : RequestPort(_name, _cpu)
+        { }
+
+      protected:
+
+        bool
+        recvTimingResp(PacketPtr pkt)
+        {
+            panic("Atomic CPU doesn't expect recvTimingResp!\n");
+        }
+
+        void
+        recvReqRetry()
+        {
+            panic("Atomic CPU doesn't expect recvRetry!\n");
+        }
+
+    };
+
     class AtomicCPUDPort : public AtomicCPUPort
     {
 
@@ -157,6 +182,7 @@ class AtomicSimpleCPU : public BaseSimpleCPU
 
     AtomicCPUPort icachePort;
     AtomicCPUDPort dcachePort;
+    AtomicCPUMPort mcachePort;
 
 
     RequestPtr ifetch_req;
@@ -177,6 +203,9 @@ class AtomicSimpleCPU : public BaseSimpleCPU
 
     /** Return a reference to the instruction port. */
     Port &getInstPort() override { return icachePort; }
+
+    /** Return a reference to the meta port. */
+    Port &getMetaPort() override { return mcachePort; }
 
     /** Perform snoop for other cpu-local thread contexts. */
     void threadSnoop(PacketPtr pkt, ThreadID sender);
