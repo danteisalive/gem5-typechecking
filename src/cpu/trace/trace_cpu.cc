@@ -46,6 +46,7 @@ TraceCPU::TraceCPU(const TraceCPUParams &params)
     :   BaseCPU(params),
         icachePort(this),
         dcachePort(this),
+        mcachePort(this),
         instRequestorID(params.system->getRequestorId(this, "inst")),
         dataRequestorID(params.system->getRequestorId(this, "data")),
         instTraceFile(params.instTraceFile),
