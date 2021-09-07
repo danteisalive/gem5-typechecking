@@ -94,9 +94,10 @@ class Fetch1 : public Named
 
       protected:
         bool recvTimingResp(PacketPtr pkt)
-        { assert(0); /**not implemented*/ }
+        { panic("Not implemented!\n"); /**not implemented*/ }
 
-        void recvReqRetry() { assert(0); /** not implemented */}
+        void recvReqRetry()
+        { panic("Not implemented!\n"); /**not implemented*/}
     };
 
     /** Memory access queuing.
