@@ -48,6 +48,9 @@
 #include "cpu/static_inst.hh"
 #include "sim/sim_object.hh"
 
+namespace gem5
+{
+
 class ThreadContext;
 
 namespace Trace {
@@ -91,12 +94,12 @@ class InstRecord
      * @TODO fix this and record all destintations that an instruction writes
      * @see data_status
      */
-    union {
+    union
+    {
         uint64_t as_int;
         double as_double;
-        ::VecRegContainer<TheISA::VecRegSizeBytes>* as_vec;
-        ::VecPredRegContainer<TheISA::VecPredRegSizeBits,
-                              TheISA::VecPredRegHasPackedRepr>* as_pred;
+        TheISA::VecRegContainer* as_vec;
+        TheISA::VecPredRegContainer* as_pred;
     } data;
 
     /** @defgroup fetch_seq
@@ -114,7 +117,8 @@ class InstRecord
     /** @ingroup data
      * What size of data was written?
      */
-    enum DataStatus {
+    enum DataStatus
+    {
         DataInvalid = 0,
         DataInt8 = 1,   // set to equal number of bytes
         DataInt16 = 2,
@@ -202,18 +206,16 @@ class InstRecord
     void setData(double d) { data.as_double = d; data_status = DataDouble; }
 
     void
-    setData(::VecRegContainer<TheISA::VecRegSizeBytes>& d)
+    setData(TheISA::VecRegContainer& d)
     {
-        data.as_vec = new ::VecRegContainer<TheISA::VecRegSizeBytes>(d);
+        data.as_vec = new TheISA::VecRegContainer(d);
         data_status = DataVec;
     }
 
     void
-    setData(::VecPredRegContainer<TheISA::VecPredRegSizeBits,
-                                  TheISA::VecPredRegHasPackedRepr>& d)
+    setData(TheISA::VecPredRegContainer& d)
     {
-        data.as_pred = new ::VecPredRegContainer<
-            TheISA::VecPredRegSizeBits, TheISA::VecPredRegHasPackedRepr>(d);
+        data.as_pred = new TheISA::VecPredRegContainer(d);
         data_status = DataVecPred;
     }
 
@@ -269,8 +271,7 @@ class InstTracer : public SimObject
                 const StaticInstPtr macroStaticInst = NULL) = 0;
 };
 
-
-
 } // namespace Trace
+} // namespace gem5
 
 #endif // __INSTRECORD_HH__

@@ -49,7 +49,12 @@
 #include "base/cprintf.hh"
 #include "base/logging.hh"
 
-namespace Debug {
+namespace gem5
+{
+
+GEM5_DEPRECATED_NAMESPACE(Debug, debug);
+namespace debug
+{
 
 //
 // This function will cause the process to signal itself with a
@@ -62,7 +67,7 @@ breakpoint()
 #ifndef NDEBUG
     kill(getpid(), SIGTRAP);
 #else
-    cprintf("Debug::breakpoint suppressed, compiled with NDEBUG\n");
+    cprintf("debug::breakpoint suppressed, compiled with NDEBUG\n");
 #endif
 }
 
@@ -137,20 +142,6 @@ CompoundFlag::disable()
 }
 
 bool
-CompoundFlag::enabled() const
-{
-    if (_kids.empty())
-        return false;
-
-    for (auto& k : _kids) {
-        if (!k->enabled())
-            return false;
-    }
-
-    return true;
-}
-
-bool
 changeFlag(const char *s, bool value)
 {
     Flag *f = findFlag(s);
@@ -165,30 +156,32 @@ changeFlag(const char *s, bool value)
     return true;
 }
 
-} // namespace Debug
+} // namespace debug
 
 // add a set of functions that can easily be invoked from gdb
 void
 setDebugFlag(const char *string)
 {
-    Debug::changeFlag(string, true);
+    debug::changeFlag(string, true);
 }
 
 void
 clearDebugFlag(const char *string)
 {
-    Debug::changeFlag(string, false);
+    debug::changeFlag(string, false);
 }
 
 void
-dumpDebugFlags()
+dumpDebugFlags(std::ostream &os)
 {
-    using namespace Debug;
+    using namespace debug;
     FlagsMap::iterator i = allFlags().begin();
     FlagsMap::iterator end = allFlags().end();
     for (; i != end; ++i) {
         SimpleFlag *f = dynamic_cast<SimpleFlag *>(i->second);
-        if (f && f->enabled())
-            cprintf("%s\n", f->name());
+        if (f && f->tracing())
+            ccprintf(os, "%s\n", f->name());
     }
 }
+
+} // namespace gem5

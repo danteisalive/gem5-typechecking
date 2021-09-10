@@ -39,11 +39,16 @@
 #define __ARCH_X86_INSTS_MICROOP_HH__
 
 #include "arch/x86/insts/static_inst.hh"
+#include "base/compiler.hh"
+
+namespace gem5
+{
 
 namespace X86ISA
 {
 
-namespace ConditionTests
+GEM5_DEPRECATED_NAMESPACE(ConditionTests, condition_tests);
+namespace condition_tests
 {
 
 enum CondTest
@@ -115,7 +120,7 @@ class X86MicroopBase : public X86StaticInst
 
     std::string
     generateDisassembly(Addr pc,
-                       const Loader::SymbolTable *symtab) const override
+                       const loader::SymbolTable *symtab) const override
     {
         std::stringstream ss;
 
@@ -134,8 +139,28 @@ class X86MicroopBase : public X86StaticInst
         else
             pcState.uAdvance();
     }
+
+    PCState branchTarget(const PCState &branchPC) const override;
+
+    // Explicitly import the otherwise hidden branchTarget.
+    using StaticInst::branchTarget;
 };
 
-}
+class MicroCondBase : public X86MicroopBase
+{
+  protected:
+    uint8_t cc;
+
+  public:
+    MicroCondBase(ExtMachInst mach_inst, const char *mnem,
+            const char *inst_mnem, uint64_t set_flags, OpClass op_class,
+            uint8_t _cc) :
+        X86MicroopBase(mach_inst, mnem, inst_mnem, set_flags, op_class),
+        cc(_cc)
+    {}
+};
+
+} // namespace X86ISA
+} // namespace gem5
 
 #endif //__ARCH_X86_INSTS_MICROOP_HH__

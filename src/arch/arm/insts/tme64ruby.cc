@@ -39,11 +39,13 @@
 #include "arch/arm/htm.hh"
 #include "arch/arm/insts/tme64.hh"
 #include "arch/arm/locked_mem.hh"
-#include "arch/arm/registers.hh"
 #include "arch/generic/memhelpers.hh"
 #include "debug/ArmTme.hh"
 #include "mem/packet_access.hh"
 #include "mem/request.hh"
+
+namespace gem5
+{
 
 using namespace ArmISA;
 
@@ -267,4 +269,5 @@ MicroTcommit64::completeAcc(PacketPtr pkt, ExecContext *xc,
     return fault;
 }
 
-} // namespace
+} // namespace ArmISAInst
+} // namespace gem5

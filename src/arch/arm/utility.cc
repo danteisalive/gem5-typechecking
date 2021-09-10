@@ -41,63 +41,23 @@
 
 #include "arch/arm/faults.hh"
 #include "arch/arm/interrupts.hh"
-#include "arch/arm/isa_traits.hh"
 #include "arch/arm/mmu.hh"
+#include "arch/arm/page_size.hh"
+#include "arch/arm/regs/cc.hh"
+#include "arch/arm/regs/int.hh"
 #include "arch/arm/system.hh"
+#include "base/compiler.hh"
 #include "cpu/base.hh"
 #include "cpu/checker/cpu.hh"
 #include "cpu/thread_context.hh"
 #include "mem/port_proxy.hh"
 #include "sim/full_system.hh"
 
+namespace gem5
+{
+
 namespace ArmISA
 {
-
-static void
-copyVecRegs(ThreadContext *src, ThreadContext *dest)
-{
-    auto src_mode = RenameMode<ArmISA::ISA>::mode(src->pcState());
-
-    // The way vector registers are copied (VecReg vs VecElem) is relevant
-    // in the O3 model only.
-    if (src_mode == Enums::Full) {
-        for (auto idx = 0; idx < NumVecRegs; idx++)
-            dest->setVecRegFlat(idx, src->readVecRegFlat(idx));
-    } else {
-        for (auto idx = 0; idx < NumVecRegs; idx++)
-            for (auto elem_idx = 0; elem_idx < NumVecElemPerVecReg; elem_idx++)
-                dest->setVecElemFlat(
-                    idx, elem_idx, src->readVecElemFlat(idx, elem_idx));
-    }
-}
-
-void
-copyRegs(ThreadContext *src, ThreadContext *dest)
-{
-    for (int i = 0; i < NumIntRegs; i++)
-        dest->setIntRegFlat(i, src->readIntRegFlat(i));
-
-    for (int i = 0; i < NumFloatRegs; i++)
-        dest->setFloatRegFlat(i, src->readFloatRegFlat(i));
-
-    for (int i = 0; i < NumCCRegs; i++)
-        dest->setCCReg(i, src->readCCReg(i));
-
-    for (int i = 0; i < NumMiscRegs; i++)
-        dest->setMiscRegNoEffect(i, src->readMiscRegNoEffect(i));
-
-    copyVecRegs(src, dest);
-
-    // setMiscReg "with effect" will set the misc register mapping correctly.
-    // e.g. updateRegMap(val)
-    dest->setMiscReg(MISCREG_CPSR, src->readMiscRegNoEffect(MISCREG_CPSR));
-
-    // Copy over the PC State
-    dest->pcState(src->pcState());
-
-    // Invalidate the tlb misc register cache
-    static_cast<MMU *>(dest->getMMUPtr())->invalidateMiscReg();
-}
 
 void
 sendEvent(ThreadContext *tc)
@@ -184,7 +144,7 @@ readMPIDR(ArmSystem *arm_sys, ThreadContext *tc)
         // be part of the table even if MPIDR is not accessible in user
         // mode.
         warn_once("Trying to read MPIDR at EL0\n");
-        M5_FALLTHROUGH;
+        GEM5_FALLTHROUGH;
       case EL1:
         if (ArmSystem::haveEL(tc, EL2) && !is_secure)
             return tc->readMiscReg(MISCREG_VMPIDR_EL2);
@@ -1371,3 +1331,4 @@ encodePhysAddrRange64(int pa_size)
 }
 
 } // namespace ArmISA
+} // namespace gem5

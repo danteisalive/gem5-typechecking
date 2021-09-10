@@ -57,6 +57,7 @@
 /// application on the host machine.
 
 #if defined(__linux__)
+#include <sched.h>
 #include <sys/eventfd.h>
 #include <sys/statfs.h>
 
@@ -86,7 +87,6 @@
 #include <string>
 
 #include "arch/generic/tlb.hh"
-#include "arch/utility.hh"
 #include "base/intmath.hh"
 #include "base/loader/object_file.hh"
 #include "base/logging.hh"
@@ -113,6 +113,9 @@
 #elif defined(__FreeBSD__) && !defined(CMSG_ALIGN)
 #define CMSG_ALIGN(n) _ALIGN(n)
 #endif
+
+namespace gem5
+{
 
 //////////////////////////////////////////////////////////////////////
 //
@@ -268,7 +271,7 @@ SyscallReturn dup2Func(SyscallDesc *desc, ThreadContext *tc,
 
 /// Target fcntl() handler.
 SyscallReturn fcntlFunc(SyscallDesc *desc, ThreadContext *tc,
-                        int tgt_fd, int cmd, GuestABI::VarArgs<int> varargs);
+                        int tgt_fd, int cmd, guest_abi::VarArgs<int> varargs);
 
 /// Target fcntl64() handler.
 SyscallReturn fcntl64Func(SyscallDesc *desc, ThreadContext *tc,
@@ -520,7 +523,7 @@ getElapsedTimeMicro(T1 &sec, T2 &usec)
 {
     static const int OneMillion = 1000 * 1000;
 
-    uint64_t elapsed_usecs = curTick() / SimClock::Int::us;
+    uint64_t elapsed_usecs = curTick() / sim_clock::as_int::us;
     sec = elapsed_usecs / OneMillion;
     usec = elapsed_usecs % OneMillion;
 }
@@ -533,7 +536,7 @@ getElapsedTimeNano(T1 &sec, T2 &nsec)
 {
     static const int OneBillion = 1000 * 1000 * 1000;
 
-    uint64_t elapsed_nsecs = curTick() / SimClock::Int::ns;
+    uint64_t elapsed_nsecs = curTick() / sim_clock::as_int::ns;
     sec = elapsed_nsecs / OneBillion;
     nsec = elapsed_nsecs % OneBillion;
 }
@@ -772,14 +775,13 @@ openatFunc(SyscallDesc *desc, ThreadContext *tc,
      * Translate target flags into host flags. Flags exist which are not
      * ported between architectures which can cause check failures.
      */
-    for (int i = 0; i < OS::NUM_OPEN_FLAGS; i++) {
-        if (tgt_flags & OS::openFlagTable[i].tgtFlag) {
-            tgt_flags &= ~OS::openFlagTable[i].tgtFlag;
-            host_flags |= OS::openFlagTable[i].hostFlag;
+    for (const auto &p: OS::openFlagTable) {
+        if (tgt_flags & p.first) {
+            tgt_flags &= ~p.first;
+            host_flags |= p.second;
         }
     }
-    if (tgt_flags)
-        warn("%s: cannot decode flags %#x", desc->name(), tgt_flags);
+    warn_if(tgt_flags, "%s: cannot decode flags %#x", desc->name(), tgt_flags);
 
 #ifdef __CYGWIN32__
     host_flags |= O_BINARY;
@@ -889,6 +891,8 @@ openatFunc(SyscallDesc *desc, ThreadContext *tc,
      * process to act as a handle for the opened file.
      */
     auto ffdp = std::make_shared<FileFDEntry>(sim_fd, host_flags, path, 0);
+    // Record the file mode for checkpoint restoring
+    ffdp->setFileMode(mode);
     int tgt_fd = p->fds->allocFD(ffdp);
     DPRINTF_SYSCALL(Verbose, "%s: sim_fd[%d], target_fd[%d] -> path:%s\n"
                     "(inferred from:%s)\n", desc->name(),
@@ -1093,7 +1097,7 @@ template <class OS>
 SyscallReturn
 mremapFunc(SyscallDesc *desc, ThreadContext *tc,
         VPtr<> start, uint64_t old_length, uint64_t new_length, uint64_t flags,
-        GuestABI::VarArgs<uint64_t> varargs)
+        guest_abi::VarArgs<uint64_t> varargs)
 {
     auto p = tc->getProcessPtr();
     Addr page_bytes = p->pTable->pageSize();
@@ -1448,6 +1452,7 @@ cloneFunc(SyscallDesc *desc, ThreadContext *tc, RegVal flags, RegVal newStack,
     pp->euid = p->euid();
     pp->gid = p->gid();
     pp->egid = p->egid();
+    pp->release = p->release;
 
     /* Find the first free PID that's less than the maximum */
     std::set<int> const& pids = p->system->PIDs;
@@ -1515,6 +1520,10 @@ cloneFunc(SyscallDesc *desc, ThreadContext *tc, RegVal flags, RegVal newStack,
     cpc.advance();
     ctc->pcState(cpc);
     ctc->activate();
+
+    if (flags & OS::TGT_CLONE_VFORK) {
+        tc->suspend();
+    }
 
     return cp->pid();
 }
@@ -1698,14 +1707,14 @@ mmapFunc(SyscallDesc *desc, ThreadContext *tc,
         if (p->interpImage.contains(tc->pcState().instAddr())) {
             std::shared_ptr<FDEntry> fdep = (*p->fds)[tgt_fd];
             auto ffdp = std::dynamic_pointer_cast<FileFDEntry>(fdep);
-            auto *lib = Loader::createObjectFile(p->checkPathRedirect(
+            auto *lib = loader::createObjectFile(p->checkPathRedirect(
                     ffdp->getFileName()));
             DPRINTF_SYSCALL(Verbose, "Loading symbols from %s\n",
                 ffdp->getFileName());
 
             if (lib) {
                 Addr offset = lib->buildImage().minAddr() + start;
-                Loader::debugSymbolTable.insert(*lib->symtab().offset(offset));
+                loader::debugSymbolTable.insert(*lib->symtab().offset(offset));
             }
         }
     }
@@ -1993,6 +2002,16 @@ execveFunc(SyscallDesc *desc, ThreadContext *tc,
     };
 
     /**
+     * If we were a thread created by a clone with vfork set, wake up
+     * the thread that created us
+     */
+    if (!p->vforkContexts.empty()) {
+        ThreadContext *vtc = p->system->threads[p->vforkContexts.front()];
+        assert(vtc->status() == ThreadContext::Suspended);
+        vtc->activate();
+    }
+
+    /**
      * Note that ProcessParams is generated by swig and there are no other
      * examples of how to create anything but this default constructor. The
      * fields are manually initialized instead of passing parameters to the
@@ -2013,6 +2032,7 @@ execveFunc(SyscallDesc *desc, ThreadContext *tc,
     pp->errout.assign("cerr");
     pp->cwd.assign(p->tgtCwd);
     pp->system = p->system;
+    pp->release = p->release;
     /**
      * Prevent process object creation with identical PIDs (which will trip
      * a fatal check in Process constructor). The execve call is supposed to
@@ -2023,7 +2043,9 @@ execveFunc(SyscallDesc *desc, ThreadContext *tc,
      */
     p->system->PIDs.erase(p->pid());
     Process *new_p = pp->create();
-    delete pp;
+    // TODO: there is no way to know when the Process SimObject is done with
+    // the params pointer. Both the params pointer (pp) and the process
+    // pointer (p) are normally managed in python and are never cleaned up.
 
     /**
      * Work through the file descriptor array and close any files marked
@@ -2038,10 +2060,10 @@ execveFunc(SyscallDesc *desc, ThreadContext *tc,
 
     *new_p->sigchld = true;
 
-    delete p;
     tc->clearArchRegs();
     tc->setProcessPtr(new_p);
     new_p->assignThreadContext(tc->contextId());
+    new_p->init();
     new_p->initState();
     tc->activate();
     TheISA::PCState pcState = tc->pcState();
@@ -2103,7 +2125,7 @@ SyscallReturn
 timesFunc(SyscallDesc *desc, ThreadContext *tc, VPtr<typename OS::tms> bufp)
 {
     // Fill in the time structure (in clocks)
-    int64_t clocks = curTick() * OS::M5_SC_CLK_TCK / SimClock::Int::s;
+    int64_t clocks = curTick() * OS::M5_SC_CLK_TCK / sim_clock::as_int::s;
     bufp->tms_utime = clocks;
     bufp->tms_stime = 0;
     bufp->tms_cutime = 0;
@@ -2373,13 +2395,19 @@ selectFunc(SyscallDesc *desc, ThreadContext *tc, int nfds,
      */
     for (int i = 0; i < nfds_h; i++) {
         if (readfds && FD_ISSET(i, &readfds_h))
-            FD_SET(trans_map[i], readfds);
+            FD_SET(trans_map[i],
+                   reinterpret_cast<fd_set *>(
+                       (typename OS::fd_set *)readfds));
 
         if (writefds && FD_ISSET(i, &writefds_h))
-            FD_SET(trans_map[i], writefds);
+            FD_SET(trans_map[i],
+                   reinterpret_cast<fd_set *>(
+                       (typename OS::fd_set *)writefds));
 
         if (errorfds && FD_ISSET(i, &errorfds_h))
-            FD_SET(trans_map[i], errorfds);
+            FD_SET(trans_map[i],
+                   reinterpret_cast<fd_set *>(
+                       (typename OS::fd_set *)errorfds));
     }
 
     return retval;
@@ -2602,5 +2630,30 @@ eventfdFunc(SyscallDesc *desc, ThreadContext *tc,
     return -1;
 #endif
 }
+
+/// Target sched_getaffinity
+template <class OS>
+SyscallReturn
+schedGetaffinityFunc(SyscallDesc *desc, ThreadContext *tc,
+                     pid_t pid, size_t cpusetsize, VPtr<> cpu_set_mask)
+{
+#if defined(__linux__)
+    if (cpusetsize < CPU_ALLOC_SIZE(tc->getSystemPtr()->threads.size()))
+        return -EINVAL;
+
+    BufferArg maskBuf(cpu_set_mask, cpusetsize);
+    maskBuf.copyIn(tc->getVirtProxy());
+    for (int i = 0; i < tc->getSystemPtr()->threads.size(); i++) {
+        CPU_SET(i, (cpu_set_t *)maskBuf.bufferPtr());
+    }
+    maskBuf.copyOut(tc->getVirtProxy());
+    return CPU_ALLOC_SIZE(tc->getSystemPtr()->threads.size());
+#else
+    warnUnsupportedOS("sched_getaffinity");
+    return -1;
+#endif
+}
+
+} // namespace gem5
 
 #endif // __SIM_SYSCALL_EMUL_HH__

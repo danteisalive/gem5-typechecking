@@ -204,12 +204,6 @@ class Type(Symbol):
     def printTypeHH(self, path):
         code = self.symtab.codeFormatter()
         code('''
-/** \\file ${{self.c_ident}}.hh
- *
- *
- * Auto generated C++ code started by $__file__:$__line__
- */
-
 #ifndef __${{self.c_ident}}_HH__
 #define __${{self.c_ident}}_HH__
 
@@ -229,6 +223,12 @@ class Type(Symbol):
             parent = " :  public %s" % self["interface"]
 
         code('''
+namespace gem5
+{
+
+namespace ruby
+{
+
 $klass ${{self.c_ident}}$parent
 {
   public:
@@ -387,13 +387,16 @@ set${{dm.ident}}(const ${{dm.real_c_type}}& local_${{dm.ident}})
         code('};')
 
         code('''
-inline std::ostream&
-operator<<(std::ostream& out, const ${{self.c_ident}}& obj)
+inline ::std::ostream&
+operator<<(::std::ostream& out, const ${{self.c_ident}}& obj)
 {
     obj.print(out);
-    out << std::flush;
+    out << ::std::flush;
     return out;
 }
+
+} // namespace ruby
+} // namespace gem5
 
 #endif // __${{self.c_ident}}_HH__
 ''')
@@ -404,19 +407,18 @@ operator<<(std::ostream& out, const ${{self.c_ident}}& obj)
         code = self.symtab.codeFormatter()
 
         code('''
-/** \\file ${{self.c_ident}}.cc
- *
- * Auto generated C++ code started by $__file__:$__line__
- */
-
 #include <iostream>
 #include <memory>
 
 #include "mem/ruby/protocol/${{self.c_ident}}.hh"
 #include "mem/ruby/system/RubySystem.hh"
-''')
 
-        code('''
+namespace gem5
+{
+
+namespace ruby
+{
+
 /** \\brief Print the state of this object */
 void
 ${{self.c_ident}}::print(std::ostream& out) const
@@ -444,16 +446,16 @@ out << "${{dm.ident}} = " << printAddress(m_${{dm.ident}}) << " ";''')
         for item in self.methods:
             code(self.methods[item].generateCode())
 
+        code('''
+} // namespace ruby
+} // namespace gem5
+''')
+
         code.write(path, "%s.cc" % self.c_ident)
 
     def printEnumHH(self, path):
         code = self.symtab.codeFormatter()
         code('''
-/** \\file ${{self.c_ident}}.hh
- *
- * Auto generated C++ code started by $__file__:$__line__
- */
-
 #ifndef __${{self.c_ident}}_HH__
 #define __${{self.c_ident}}_HH__
 
@@ -469,6 +471,17 @@ out << "${{dm.ident}} = " << printAddress(m_${{dm.ident}}) << " ";''')
             code('#include "base/logging.hh"')
             code('#include "mem/ruby/common/Address.hh"')
             code('#include "mem/ruby/common/TypeDefines.hh"')
+
+        code('''
+namespace gem5
+{
+
+namespace ruby
+{
+
+''')
+
+        if self.isMachineType:
             code('struct MachineID;')
 
         code('''
@@ -496,29 +509,15 @@ enum ${{self.c_ident}} {
 };
 
 // Code to convert from a string to the enumeration
-${{self.c_ident}} string_to_${{self.c_ident}}(const std::string& str);
+${{self.c_ident}} string_to_${{self.c_ident}}(const ::std::string& str);
 
 // Code to convert state to a string
-std::string ${{self.c_ident}}_to_string(const ${{self.c_ident}}& obj);
+::std::string ${{self.c_ident}}_to_string(const ${{self.c_ident}}& obj);
 
 // Code to increment an enumeration type
 ${{self.c_ident}} &operator++(${{self.c_ident}} &e);
 ''')
 
-        if self.isMachineType:
-            code('''
-
-// define a hash function for the MachineType class
-namespace std {
-template<>
-struct hash<MachineType> {
-    std::size_t operator()(const MachineType &mtype) const {
-        return hash<size_t>()(static_cast<size_t>(mtype));
-    }
-};
-}
-
-''')
         # MachineType hack used to set the base component id for each Machine
         if self.isMachineType:
             code('''
@@ -542,10 +541,35 @@ AccessPermission ${{self.c_ident}}_to_permission(const ${{self.c_ident}}& obj);
 
 ''')
 
+        code('''
+
+::std::ostream&
+operator<<(::std::ostream& out, const ${{self.c_ident}}& obj);
+
+} // namespace ruby
+} // namespace gem5
+''')
+
+        if self.isMachineType:
+            code('''
+
+// define a hash function for the MachineType class
+namespace std {
+template<>
+struct hash<gem5::ruby::MachineType>
+{
+    std::size_t
+    operator()(const gem5::ruby::MachineType &mtype) const
+    {
+        return hash<size_t>()(static_cast<size_t>(mtype));
+    }
+};
+}
+
+''')
+
         # Trailer
         code('''
-std::ostream& operator<<(std::ostream& out, const ${{self.c_ident}}& obj);
-
 #endif // __${{self.c_ident}}_HH__
 ''')
 
@@ -554,11 +578,6 @@ std::ostream& operator<<(std::ostream& out, const ${{self.c_ident}}& obj);
     def printEnumCC(self, path):
         code = self.symtab.codeFormatter()
         code('''
-/** \\file ${{self.c_ident}}.hh
- *
- * Auto generated C++ code started by $__file__:$__line__
- */
-
 #include <cassert>
 #include <iostream>
 #include <string>
@@ -570,6 +589,12 @@ std::ostream& operator<<(std::ostream& out, const ${{self.c_ident}}& obj);
 
         if self.isStateDecl:
             code('''
+namespace gem5
+{
+
+namespace ruby
+{
+
 // Code to convert the current state to an access permission
 AccessPermission ${{self.c_ident}}_to_permission(const ${{self.c_ident}}& obj)
 {
@@ -585,7 +610,12 @@ AccessPermission ${{self.c_ident}}_to_permission(const ${{self.c_ident}}& obj)
       default:
         panic("Unknown state access permission converstion for ${{self.c_ident}}");
     }
+    // Appease the compiler since this function has a return value
+    return AccessPermission_Invalid;
 }
+
+} // namespace ruby
+} // namespace gem5
 
 ''')
 
@@ -597,12 +627,18 @@ AccessPermission ${{self.c_ident}}_to_permission(const ${{self.c_ident}}& obj)
             code('#include "mem/ruby/common/MachineID.hh"')
 
         code('''
+namespace gem5
+{
+
+namespace ruby
+{
+
 // Code for output operator
-std::ostream&
-operator<<(std::ostream& out, const ${{self.c_ident}}& obj)
+::std::ostream&
+operator<<(::std::ostream& out, const ${{self.c_ident}}& obj)
 {
     out << ${{self.c_ident}}_to_string(obj);
-    out << std::flush;
+    out << ::std::flush;
     return out;
 }
 
@@ -625,6 +661,8 @@ ${{self.c_ident}}_to_string(const ${{self.c_ident}}& obj)
       default:
         panic("Invalid range for type ${{self.c_ident}}");
     }
+    // Appease the compiler since this function has a return value
+    return "";
 }
 
 // Code to convert from a string to the enumeration
@@ -688,6 +726,8 @@ ${{self.c_ident}}_base_level(const ${{self.c_ident}}& obj)
       default:
         panic("Invalid range for type ${{self.c_ident}}");
     }
+    // Appease the compiler since this function has a return value
+    return -1;
 }
 
 /** \\brief returns the machine type for each base vector index used by NetDest
@@ -735,7 +775,7 @@ ${{self.c_ident}}_base_number(const ${{self.c_ident}}& obj)
                     code('    base += ${{enum.ident}}_Controller::getNumControllers();')
                 else:
                     code('    base += 0;')
-                code('    M5_FALLTHROUGH;')
+                code('    GEM5_FALLTHROUGH;')
                 code('  case ${{self.c_ident}}_${{enum.ident}}:')
             code('    break;')
             code.dedent()
@@ -771,6 +811,8 @@ ${{self.c_ident}}_base_count(const ${{self.c_ident}}& obj)
       default:
         panic("Invalid range for type ${{self.c_ident}}");
     }
+    // Appease the compiler since this function has a return value
+    return -1;
 }
 ''')
 
@@ -783,6 +825,11 @@ get${{enum.ident}}MachineID(NodeID RubyNode)
       MachineID mach = {MachineType_${{enum.ident}}, RubyNode};
       return mach;
 }
+''')
+
+        code('''
+} // namespace ruby
+} // namespace gem5
 ''')
 
         # Write the file

@@ -29,22 +29,33 @@
 #define __ARCH_RISCV_SE_WORKLOAD_HH__
 
 #include "arch/riscv/reg_abi.hh"
-#include "arch/riscv/registers.hh"
+#include "arch/riscv/regs/int.hh"
+#include "arch/riscv/remote_gdb.hh"
 #include "params/RiscvSEWorkload.hh"
 #include "sim/se_workload.hh"
 #include "sim/syscall_abi.hh"
 
+namespace gem5
+{
+
 namespace RiscvISA
 {
 
-class SEWorkload : public ::SEWorkload
+class SEWorkload : public gem5::SEWorkload
 {
   public:
     using Params = RiscvSEWorkloadParams;
 
-    SEWorkload(const Params &p) : ::SEWorkload(p) {}
+    SEWorkload(const Params &p) : gem5::SEWorkload(p) {}
 
-    ::Loader::Arch getArch() const override { return ::Loader::Riscv64; }
+    void
+    setSystem(System *sys) override
+    {
+        gem5::SEWorkload::setSystem(sys);
+        gdb = BaseRemoteGDB::build<RemoteGDB>(system);
+    }
+
+    loader::Arch getArch() const override { return loader::Riscv64; }
 
     //FIXME RISCV needs to handle 64 bit arguments in its 32 bit ISA.
     using SyscallABI = RegABI64;
@@ -52,7 +63,8 @@ class SEWorkload : public ::SEWorkload
 
 } // namespace RiscvISA
 
-namespace GuestABI
+GEM5_DEPRECATED_NAMESPACE(GuestABI, guest_abi);
+namespace guest_abi
 {
 
 template <>
@@ -74,6 +86,7 @@ struct Result<RiscvISA::SEWorkload::SyscallABI, SyscallReturn>
     }
 };
 
-} // namespace GuestABI
+} // namespace guest_abi
+} // namespace gem5
 
 #endif // __ARCH_RISCV_SE_WORKLOAD_HH__

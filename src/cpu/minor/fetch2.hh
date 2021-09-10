@@ -47,13 +47,18 @@
 
 #include <vector>
 
+#include "base/named.hh"
 #include "cpu/minor/buffers.hh"
 #include "cpu/minor/cpu.hh"
 #include "cpu/minor/pipe_data.hh"
 #include "cpu/pred/bpred_unit.hh"
 #include "params/MinorCPU.hh"
 
-namespace Minor
+namespace gem5
+{
+
+GEM5_DEPRECATED_NAMESPACE(Minor, minor);
+namespace minor
 {
 
 /** This stage receives lines of data from Fetch1, separates them into
@@ -88,7 +93,7 @@ class Fetch2 : public Named
     bool processMoreThanOneInput;
 
     /** Branch predictor passed from Python configuration */
-    BPredUnit &branchPredictor;
+    branch_prediction::BPredUnit &branchPredictor;
 
   public:
     /* Public so that Pipeline can pass it to Fetch1 */
@@ -97,7 +102,8 @@ class Fetch2 : public Named
   protected:
     /** Data members after this line are cycle-to-cycle state */
 
-    struct Fetch2ThreadInfo {
+    struct Fetch2ThreadInfo
+    {
 
         /** Default constructor */
         Fetch2ThreadInfo() :
@@ -165,16 +171,16 @@ class Fetch2 : public Named
     std::vector<Fetch2ThreadInfo> fetchInfo;
     ThreadID threadPriority;
 
-    struct Fetch2Stats : public Stats::Group
+    struct Fetch2Stats : public statistics::Group
     {
         Fetch2Stats(MinorCPU *cpu);
         /** Stats */
-        Stats::Scalar intInstructions;
-        Stats::Scalar fpInstructions;
-        Stats::Scalar vecInstructions;
-        Stats::Scalar loadInstructions;
-        Stats::Scalar storeInstructions;
-        Stats::Scalar amoInstructions;
+        statistics::Scalar intInstructions;
+        statistics::Scalar fpInstructions;
+        statistics::Scalar vecInstructions;
+        statistics::Scalar loadInstructions;
+        statistics::Scalar storeInstructions;
+        statistics::Scalar amoInstructions;
     } stats;
 
   protected:
@@ -225,6 +231,7 @@ class Fetch2 : public Named
     bool isDrained();
 };
 
-}
+} // namespace minor
+} // namespace gem5
 
 #endif /* __CPU_MINOR_FETCH2_HH__ */

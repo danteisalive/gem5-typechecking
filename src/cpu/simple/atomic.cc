@@ -42,7 +42,6 @@
 #include "cpu/simple/atomic.hh"
 
 #include "arch/locked_mem.hh"
-#include "arch/utility.hh"
 #include "base/output.hh"
 #include "config/the_isa.hh"
 #include "cpu/exetrace.hh"
@@ -57,6 +56,9 @@
 #include "sim/faults.hh"
 #include "sim/full_system.hh"
 #include "sim/system.hh"
+
+namespace gem5
+{
 
 void
 AtomicSimpleCPU::init()
@@ -387,7 +389,7 @@ AtomicSimpleCPU::readMem(Addr addr, uint8_t *data, unsigned size,
         // translate to physical address
         if (predicate) {
             fault = thread->mmu->translateAtomic(req, thread->getTC(),
-                                                 BaseTLB::Read);
+                                                 BaseMMU::Read);
         }
 
         // Now do the access.
@@ -473,7 +475,7 @@ AtomicSimpleCPU::writeMem(uint8_t *data, unsigned size, Addr addr,
         // translate to physical address
         if (predicate)
             fault = thread->mmu->translateAtomic(req, thread->getTC(),
-                                                 BaseTLB::Write);
+                                                 BaseMMU::Write);
 
         // Now do the access.
         if (predicate && fault == NoFault) {
@@ -578,7 +580,7 @@ AtomicSimpleCPU::amoMem(Addr addr, uint8_t* data, unsigned size,
 
     // translate to physical address
     Fault fault = thread->mmu->translateAtomic(
-        req, thread->getTC(), BaseTLB::Write);
+        req, thread->getTC(), BaseMMU::Write);
 
     // Now do the access.
     if (fault == NoFault && !req->getFlags().isSet(Request::NO_ACCESS)) {
@@ -645,6 +647,8 @@ AtomicSimpleCPU::tick()
             return;
         }
 
+        serviceInstCountEvents();
+
         Fault fault = NoFault;
 
         TheISA::PCState pcState = thread->pcState();
@@ -655,7 +659,7 @@ AtomicSimpleCPU::tick()
             ifetch_req->taskId(taskId());
             setupFetchRequest(ifetch_req);
             fault = thread->mmu->translateAtomic(ifetch_req, thread->getTC(),
-                                                 BaseTLB::Execute);
+                                                 BaseMMU::Execute);
         }
 
         if (fault == NoFault) {
@@ -740,11 +744,13 @@ AtomicSimpleCPU::tick()
 Tick
 AtomicSimpleCPU::fetchInstMem()
 {
+    auto &decoder = threadInfo[curThread]->thread->decoder;
+
     Packet pkt = Packet(ifetch_req, MemCmd::ReadReq);
 
     // ifetch_req is initialized to read the instruction
     // directly into the CPU object's inst field.
-    pkt.dataStatic(&inst);
+    pkt.dataStatic(decoder.moreBytesPtr());
 
     Tick latency = sendPacket(icachePort, &pkt);
     assert(!pkt.isError());
@@ -766,3 +772,5 @@ AtomicSimpleCPU::printAddr(Addr a)
 {
     dcachePort.printAddr(a);
 }
+
+} // namespace gem5

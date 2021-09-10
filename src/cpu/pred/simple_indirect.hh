@@ -36,6 +36,12 @@
 #include "cpu/pred/indirect.hh"
 #include "params/SimpleIndirectPredictor.hh"
 
+namespace gem5
+{
+
+namespace branch_prediction
+{
+
 class SimpleIndirectPredictor : public IndirectPredictor
 {
   public:
@@ -87,7 +93,8 @@ class SimpleIndirectPredictor : public IndirectPredictor
     };
 
 
-    struct ThreadInfo {
+    struct ThreadInfo
+    {
         ThreadInfo() : headHistEntry(0), ghr(0) { }
 
         std::deque<HistoryEntry> pathHist;
@@ -97,5 +104,8 @@ class SimpleIndirectPredictor : public IndirectPredictor
 
     std::vector<ThreadInfo> threadInfo;
 };
+
+} // namespace branch_prediction
+} // namespace gem5
 
 #endif // __CPU_PRED_INDIRECT_HH__

@@ -57,11 +57,15 @@
 #include <vector>
 
 #include "base/amo.hh"
+#include "base/compiler.hh"
 #include "base/flags.hh"
 #include "base/types.hh"
 #include "cpu/inst_seq.hh"
 #include "mem/htm.hh"
-#include "sim/core.hh"
+#include "sim/cur_tick.hh"
+
+namespace gem5
+{
 
 /**
  * Special TaskIds that are used for per-context-switch stats dumps
@@ -70,9 +74,11 @@
  * doesn't cause a problem with stats and is large enough to realistic
  * benchmarks (Linux/Android boot, BBench, etc.)
  */
-
-namespace ContextSwitchTaskId {
-    enum TaskId {
+GEM5_DEPRECATED_NAMESPACE(ContextSwitchTaskId, context_switch_task_id);
+namespace context_switch_task_id
+{
+    enum TaskId
+    {
         MaxNormalTaskId = 1021, /* Maximum number of normal tasks */
         Prefetcher = 1022, /* For cache lines brought in by prefetcher */
         DMA = 1023, /* Mostly Table Walker */
@@ -93,9 +99,10 @@ class Request
   public:
     typedef uint64_t FlagsType;
     typedef uint8_t ArchFlagsType;
-    typedef ::Flags<FlagsType> Flags;
+    typedef gem5::Flags<FlagsType> Flags;
 
-    enum : FlagsType {
+    enum : FlagsType
+    {
         /**
          * Architecture specific flags.
          *
@@ -242,7 +249,8 @@ class Request
 
     /** Requestor Ids that are statically allocated
      * @{*/
-    enum : RequestorID {
+    enum : RequestorID
+    {
         /** This requestor id is used for writeback requests by the caches */
         wbRequestorId = 0,
         /**
@@ -261,7 +269,7 @@ class Request
     /** @} */
 
     typedef uint64_t CacheCoherenceFlagsType;
-    typedef ::Flags<CacheCoherenceFlagsType> CacheCoherenceFlags;
+    typedef gem5::Flags<CacheCoherenceFlagsType> CacheCoherenceFlags;
 
     /**
      * These bits are used to set the coherence policy for the GPU and are
@@ -290,13 +298,26 @@ class Request
      * For atomics, the GLC bit is used to distinguish between between atomic
      * return/no-return operations. These flags are used by GPUDynInst.
      */
-    enum : CacheCoherenceFlagsType {
+    enum : CacheCoherenceFlagsType
+    {
         /** mem_sync_op flags */
-        INV_L1                  = 0x00000001,
+        I_CACHE_INV             = 0x00000001,
+        INV_L1                  = I_CACHE_INV,
+        V_CACHE_INV             = 0x00000002,
+        K_CACHE_INV             = 0x00000004,
+        GL1_CACHE_INV           = 0x00000008,
+        K_CACHE_WB              = 0x00000010,
         FLUSH_L2                = 0x00000020,
+        GL2_CACHE_INV           = 0x00000040,
         /** user-policy flags */
         SLC_BIT                 = 0x00000080,
-        GLC_BIT                 = 0x00000100,
+        DLC_BIT                 = 0x00000100,
+        GLC_BIT                 = 0x00000200,
+        /** mtype flags */
+        CACHED                  = 0x00000400,
+        READ_WRITE              = 0x00000800,
+        SHARED                  = 0x00001000,
+
     };
 
     using LocalAccessor =
@@ -304,9 +325,10 @@ class Request
 
   private:
     typedef uint16_t PrivateFlagsType;
-    typedef ::Flags<PrivateFlagsType> PrivateFlags;
+    typedef gem5::Flags<PrivateFlagsType> PrivateFlags;
 
-    enum : PrivateFlagsType {
+    enum : PrivateFlagsType
+    {
         /** Whether or not the size is valid. */
         VALID_SIZE           = 0x00000001,
         /** Whether or not paddr is valid (has been written yet). */
@@ -378,7 +400,7 @@ class Request
     /**
      * The task id associated with this request
      */
-    uint32_t _taskId = ContextSwitchTaskId::Unknown;
+    uint32_t _taskId = context_switch_task_id::Unknown;
 
     /**
      * The stream ID uniquely identifies a device behind the
@@ -993,5 +1015,7 @@ class Request
     bool isCacheMaintenance() const { return _flags.isSet(CLEAN|INVALIDATE); }
     /** @} */
 };
+
+} // namespace gem5
 
 #endif // __MEM_REQUEST_HH__

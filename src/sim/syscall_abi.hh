@@ -34,6 +34,9 @@
 #include "sim/guest_abi.hh"
 #include "sim/syscall_return.hh"
 
+namespace gem5
+{
+
 class SyscallDesc;
 
 struct GenericSyscallABI
@@ -69,7 +72,8 @@ struct GenericSyscallABI32 : public GenericSyscallABI
     }
 };
 
-namespace GuestABI
+GEM5_DEPRECATED_NAMESPACE(GuestABI, guest_abi);
+namespace guest_abi
 {
 
 // For 64 bit systems, return syscall args directly.
@@ -104,6 +108,7 @@ struct Argument<ABI, Arg,
     }
 };
 
-} // namespace GuestABI
+} // namespace guest_abi
+} // namespace gem5
 
 #endif // __SIM_SYSCALL_ABI_HH__

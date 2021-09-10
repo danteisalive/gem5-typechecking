@@ -36,6 +36,9 @@
 #include "gpu-compute/compute_unit.hh"
 #include "gpu-compute/wavefront.hh"
 
+namespace gem5
+{
+
 FetchStage::FetchStage(const ComputeUnitParams &p, ComputeUnit &cu)
     : numVectorALUs(p.num_SIMDs), computeUnit(cu),
       _name(cu.name() + ".FetchStage"), stats(&cu)
@@ -90,10 +93,12 @@ FetchStage::fetch(PacketPtr pkt, Wavefront *wavefront)
     _fetchUnit[wavefront->simdId].fetch(pkt, wavefront);
 }
 
-FetchStage::FetchStageStats::FetchStageStats(Stats::Group *parent)
-    : Stats::Group(parent, "FetchStage"),
+FetchStage::FetchStageStats::FetchStageStats(statistics::Group *parent)
+    : statistics::Group(parent, "FetchStage"),
       ADD_STAT(instFetchInstReturned, "For each instruction fetch request "
                "received record how many instructions you got from it")
 {
         instFetchInstReturned.init(1, 32, 1);
 }
+
+} // namespace gem5

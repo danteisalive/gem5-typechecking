@@ -50,9 +50,13 @@
 #include "debug/DistEthernet.hh"
 #include "debug/DistEthernetPkt.hh"
 #include "dev/net/etherpkt.hh"
+#include "sim/cur_tick.hh"
 #include "sim/sim_exit.hh"
 #include "sim/sim_object.hh"
 #include "sim/system.hh"
+
+namespace gem5
+{
 
 DistIface::Sync *DistIface::sync = nullptr;
 System *DistIface::sys = nullptr;
@@ -937,3 +941,5 @@ DistIface::sizeParam()
     }
     return val;
 }
+
+} // namespace gem5

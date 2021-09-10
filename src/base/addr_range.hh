@@ -50,6 +50,9 @@
 #include "base/logging.hh"
 #include "base/types.hh"
 
+namespace gem5
+{
+
 /**
  * The AddrRange class encapsulates an address range, and supports a
  * number of tests to check if two ranges intersect, if a range
@@ -131,7 +134,7 @@ class AddrRange
           intlvMatch(_intlv_match)
     {
         // sanity checks
-        fatal_if(!masks.empty() && _intlv_match >= ULL(1) << masks.size(),
+        fatal_if(!masks.empty() && _intlv_match >= 1ULL << masks.size(),
                  "Match value %d does not fit in %d interleaving bits\n",
                  _intlv_match, masks.size());
     }
@@ -169,7 +172,7 @@ class AddrRange
           intlvMatch(_intlv_match)
     {
         // sanity checks
-        fatal_if(_intlv_bits && _intlv_match >= ULL(1) << _intlv_bits,
+        fatal_if(_intlv_bits && _intlv_match >= 1ULL << _intlv_bits,
                  "Match value %d does not fit in %d interleaving bits\n",
                  _intlv_match, _intlv_bits);
 
@@ -226,7 +229,7 @@ class AddrRange
         // interleaved range
         if (ranges.size() > 1) {
 
-            if (ranges.size() != (ULL(1) << masks.size()))
+            if (ranges.size() != (1ULL << masks.size()))
                 fatal("Got %d ranges spanning %d interleaving bits\n",
                       ranges.size(), masks.size());
 
@@ -271,7 +274,7 @@ class AddrRange
                 combined_mask |= mask;
             }
             const uint8_t lowest_bit = ctz64(combined_mask);
-            return ULL(1) << lowest_bit;
+            return 1ULL << lowest_bit;
         } else {
             return size();
         }
@@ -285,7 +288,7 @@ class AddrRange
      *
      * @ingroup api_addr_range
      */
-    uint32_t stripes() const { return ULL(1) << masks.size(); }
+    uint32_t stripes() const { return 1ULL << masks.size(); }
 
     /**
      * Get the size of the address range. For a case where
@@ -593,12 +596,19 @@ class AddrRange
      */
     bool operator<(const AddrRange& r) const
     {
-        if (_start != r._start)
+        if (_start != r._start) {
             return _start < r._start;
-        else
-            // for now assume that the end is also the same, and that
-            // we are looking at the same interleaving bits
-            return intlvMatch < r.intlvMatch;
+        } else {
+            // For now assume that the end is also the same.
+            // If both regions are interleaved, assume same interleaving,
+            // and compare intlvMatch values.
+            // Otherwise, return true if this address range is interleaved.
+            if (interleaved() && r.interleaved()) {
+                return intlvMatch < r.intlvMatch;
+            } else {
+                return interleaved();
+            }
+        }
     }
 
     /**
@@ -650,5 +660,7 @@ RangeIn(Addr start, Addr end)
 inline AddrRange
 RangeSize(Addr start, Addr size)
 { return AddrRange(start, start + size); }
+
+} // namespace gem5
 
 #endif // __BASE_ADDR_RANGE_HH__

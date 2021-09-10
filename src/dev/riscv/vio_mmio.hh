@@ -43,6 +43,9 @@
 #include "dev/riscv/plic_device.hh"
 #include "dev/virtio/base.hh"
 
+namespace gem5
+{
+
 struct MmioVirtIOParams;
 
 class MmioVirtIO : public PlicIntDevice
@@ -59,7 +62,8 @@ class MmioVirtIO : public PlicIntDevice
     /** @{ */
     /** Offsets into VirtIO MMIO space. */
 
-    enum : Addr {
+    enum : Addr
+    {
         OFF_MAGIC = 0x00,
         OFF_VERSION = 0x04,
         OFF_DEVICE_ID = 0x08,
@@ -83,7 +87,8 @@ class MmioVirtIO : public PlicIntDevice
 
     /** @} */
 
-    enum {
+    enum
+    {
         INT_USED_RING = 1 << 0,
         INT_CONFIG = 1 << 1,
     };
@@ -107,5 +112,7 @@ class MmioVirtIO : public PlicIntDevice
   protected: // Params
     VirtIODeviceBase &vio;
 };
+
+} // namespace gem5
 
 #endif // __DEV_ARM_VIO_MMIO_HH__

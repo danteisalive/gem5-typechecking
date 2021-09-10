@@ -47,10 +47,11 @@
 
 
 #include <algorithm>
+#include <fstream>
 #include <iostream>
 #include <iterator>
 #include <stack>
-#include <set>
+#include <string>
 #include <type_traits>
 #include <unordered_map>
 #include <vector>
@@ -59,25 +60,21 @@
 #include "base/logging.hh"
 #include "sim/serialize_handlers.hh"
 
-class IniFile;
-class SimObject;
-class SimObjectResolver;
+namespace gem5
+{
 
 typedef std::ostream CheckpointOut;
 
 class CheckpointIn
 {
   private:
-
-    IniFile *db;
-
-    SimObjectResolver &objNameResolver;
+    IniFile db;
 
     const std::string _cptDir;
 
   public:
-    CheckpointIn(const std::string &cpt_dir, SimObjectResolver &resolver);
-    ~CheckpointIn();
+    CheckpointIn(const std::string &cpt_dir);
+    ~CheckpointIn() = default;
 
     /**
      * @return Returns the current directory being used for creating
@@ -89,9 +86,6 @@ class CheckpointIn
 
     bool find(const std::string &section, const std::string &entry,
               std::string &value);
-
-    bool findObj(const std::string &section, const std::string &entry,
-                 SimObject *&value);
 
     bool entryExists(const std::string &section, const std::string &entry);
     bool sectionExists(const std::string &section);
@@ -175,7 +169,8 @@ class CheckpointIn
 class Serializable
 {
   public:
-    class ScopedCheckpointSection {
+    class ScopedCheckpointSection
+    {
       public:
         /**
          * This is the constructor for Scoped checkpoint section helper
@@ -306,16 +301,15 @@ class Serializable
     static const std::string &currentSection();
 
     /**
-     * Serializes all the SimObjects.
+     * Generate a checkpoint file so that the serialization can be routed to
+     * it.
      *
+     * @param cpt_dir The dir at which the cpt file will be created.
+     * @param outstream The cpt file.
      * @ingroup api_serialize
      */
-    static void serializeAll(const std::string &cpt_dir);
-
-    /**
-     * @ingroup api_serialize
-     */
-    static void unserializeGlobals(CheckpointIn &cp);
+    static void generateCheckpointOut(const std::string &cpt_dir,
+        std::ofstream &outstream);
 
   private:
     static std::stack<std::string> path;
@@ -509,16 +503,6 @@ arrayParamIn(CheckpointIn &cp, const std::string &name,
     arrayParamIn<T>(cp, name, insert_it, size);
 }
 
-void
-debug_serialize(const std::string &cpt_dir);
-
-
-/**
- * @ingroup api_serialize
- */
-void
-objParamIn(CheckpointIn &cp, const std::string &name, SimObject * &param);
-
 /**
  * Serialize a mapping represented as two arrays: one containing names
  * and the other containing values.
@@ -651,25 +635,13 @@ mappingParamIn(CheckpointIn &cp, const char* sectionName,
         arrayParamIn(cp, #member, member)
 
 /**
- * \def SERIALIZE_EVENT(event)
- *
- * @ingroup api_serialize
- */
-#define SERIALIZE_EVENT(event) event.serializeSection(cp, #event);
-
-/**
- * \def UNSERIALIZE_EVENT(event)
- *
- * @ingroup api_serialize
- */
-#define UNSERIALIZE_EVENT(event)                        \
-    do {                                                \
-        event.unserializeSection(cp, #event);           \
-        eventQueue()->checkpointReschedule(&event);     \
-    } while (0)
-
-/**
  * \def SERIALIZE_OBJ(obj)
+ *
+ * This macro serializes an object into its own section. The object must
+ * inherit from Serializable, but NOT from SimObject (i.e, it is an object
+ * in the strict sense of "object oriented programing"). Objects that
+ * derive from SimObject are automatically serialized elsewhere
+ * (@see Serializable, SimObject::serializeAll()).
  *
  * @ingroup api_serialize
  */
@@ -683,25 +655,6 @@ mappingParamIn(CheckpointIn &cp, const char* sectionName,
 #define UNSERIALIZE_OBJ(obj) obj.unserializeSection(cp, #obj)
 
 /**
- * \def SERIALIZE_OBJPTR(objptr)
- *
- * @ingroup api_serialize
- */
-#define SERIALIZE_OBJPTR(objptr)        paramOut(cp, #objptr, (objptr)->name())
-
-/**
- * \def UNSERIALIZE_OBJPTR(objptr)
- *
- * @ingroup api_serialize
- */
-#define UNSERIALIZE_OBJPTR(objptr)                      \
-    do {                                                \
-        SimObject *sptr;                                \
-        objParamIn(cp, #objptr, sptr);                  \
-        objptr = dynamic_cast<decltype(objptr)>(sptr);  \
-    } while (0)
-
-/**
  * \def SERIALIZE_MAPPING(member, names, size)
  */
 #define SERIALIZE_MAPPING(member, names, size) \
@@ -712,5 +665,7 @@ mappingParamIn(CheckpointIn &cp, const char* sectionName,
  */
 #define UNSERIALIZE_MAPPING(member, names, size) \
         mappingParamIn(cp, #member, names, member, size)
+
+} // namespace gem5
 
 #endif // __SERIALIZE_HH__

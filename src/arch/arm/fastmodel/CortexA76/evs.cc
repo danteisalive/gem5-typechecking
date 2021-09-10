@@ -34,14 +34,18 @@
 #include "sim/core.hh"
 #include "systemc/tlm_bridge/gem5_to_tlm.hh"
 
-namespace FastModel
+namespace gem5
+{
+
+GEM5_DEPRECATED_NAMESPACE(FastModel, fastmodel);
+namespace fastmodel
 {
 
 template <class Types>
 void
 ScxEvsCortexA76<Types>::setClkPeriod(Tick clk_period)
 {
-    clockRateControl->set_mul_div(SimClock::Int::s, clk_period);
+    clockRateControl->set_mul_div(sim_clock::as_int::s, clk_period);
 }
 
 template <class Types>
@@ -153,4 +157,5 @@ template class ScxEvsCortexA76<ScxEvsCortexA76x2Types>;
 template class ScxEvsCortexA76<ScxEvsCortexA76x3Types>;
 template class ScxEvsCortexA76<ScxEvsCortexA76x4Types>;
 
-} // namespace FastModel
+} // namespace fastmodel
+} // namespace gem5

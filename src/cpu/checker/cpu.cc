@@ -52,14 +52,20 @@
 #include "params/CheckerCPU.hh"
 #include "sim/full_system.hh"
 
+namespace gem5
+{
+
 void
 CheckerCPU::init()
 {
     requestorId = systemPtr->getRequestorId(this);
+    tc->getIsaPtr()->setThreadContext(tc);
 }
 
 CheckerCPU::CheckerCPU(const Params &p)
-    : BaseCPU(p, true), systemPtr(NULL), icachePort(NULL), dcachePort(NULL),
+    : BaseCPU(p, true),
+      zeroReg(params().isa[0]->regClasses().at(IntRegClass).zeroReg()),
+      systemPtr(NULL), icachePort(NULL), dcachePort(NULL),
       tc(NULL), thread(NULL),
       unverifiedReq(nullptr),
       unverifiedMemData(nullptr)
@@ -190,7 +196,7 @@ CheckerCPU::readMem(Addr addr, uint8_t *data, unsigned size,
 
         // translate to physical address
         if (predicate) {
-            fault = mmu->translateFunctional(mem_req, tc, BaseTLB::Read);
+            fault = mmu->translateFunctional(mem_req, tc, BaseMMU::Read);
         }
 
         if (predicate && !checked_flags && fault == NoFault && unverifiedReq) {
@@ -274,7 +280,7 @@ CheckerCPU::writeMem(uint8_t *data, unsigned size,
         predicate = (mem_req != nullptr);
 
         if (predicate) {
-            fault = mmu->translateFunctional(mem_req, tc, BaseTLB::Write);
+            fault = mmu->translateFunctional(mem_req, tc, BaseMMU::Write);
         }
 
         if (predicate && !checked_flags && fault == NoFault && unverifiedReq) {
@@ -376,3 +382,5 @@ CheckerCPU::dumpAndExit()
          curTick(), thread->pcState());
     panic("Checker found an error!");
 }
+
+} // namespace gem5

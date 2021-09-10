@@ -46,7 +46,7 @@
 #include <csignal>
 #include <ostream>
 
-#include "arch/utility.hh"
+#include "base/compiler.hh"
 #include "debug/Checkpoint.hh"
 #include "debug/Drain.hh"
 #include "debug/Kvm.hh"
@@ -58,6 +58,9 @@
 
 /* Used by some KVM macros */
 #define PAGE_SIZE pageSize
+
+namespace gem5
+{
 
 BaseKvmCPU::BaseKvmCPU(const BaseKvmCPUParams &params)
     : BaseCPU(params),
@@ -259,29 +262,34 @@ BaseKvmCPU::startupThread()
     }
 }
 
-BaseKvmCPU::StatGroup::StatGroup(Stats::Group *parent)
-    : Stats::Group(parent),
-    ADD_STAT(committedInsts, UNIT_COUNT, "Number of instructions committed"),
-    ADD_STAT(numVMExits, UNIT_COUNT, "total number of KVM exits"),
-    ADD_STAT(numVMHalfEntries, UNIT_COUNT,
+BaseKvmCPU::StatGroup::StatGroup(statistics::Group *parent)
+    : statistics::Group(parent),
+    ADD_STAT(committedInsts, statistics::units::Count::get(),
+             "Number of instructions committed"),
+    ADD_STAT(numVMExits, statistics::units::Count::get(),
+             "total number of KVM exits"),
+    ADD_STAT(numVMHalfEntries, statistics::units::Count::get(),
              "number of KVM entries to finalize pending operations"),
-    ADD_STAT(numExitSignal, UNIT_COUNT, "exits due to signal delivery"),
-    ADD_STAT(numMMIO, UNIT_COUNT,
+    ADD_STAT(numExitSignal, statistics::units::Count::get(),
+             "exits due to signal delivery"),
+    ADD_STAT(numMMIO, statistics::units::Count::get(),
              "number of VM exits due to memory mapped IO"),
-    ADD_STAT(numCoalescedMMIO, UNIT_COUNT,
+    ADD_STAT(numCoalescedMMIO, statistics::units::Count::get(),
              "number of coalesced memory mapped IO requests"),
-    ADD_STAT(numIO, UNIT_COUNT, "number of VM exits due to legacy IO"),
-    ADD_STAT(numHalt, UNIT_COUNT,
+    ADD_STAT(numIO, statistics::units::Count::get(),
+             "number of VM exits due to legacy IO"),
+    ADD_STAT(numHalt, statistics::units::Count::get(),
              "number of VM exits due to wait for interrupt instructions"),
-    ADD_STAT(numInterrupts, UNIT_COUNT, "number of interrupts delivered"),
-    ADD_STAT(numHypercalls, UNIT_COUNT, "number of hypercalls")
+    ADD_STAT(numInterrupts, statistics::units::Count::get(),
+             "number of interrupts delivered"),
+    ADD_STAT(numHypercalls, statistics::units::Count::get(), "number of hypercalls")
 {
 }
 
 void
 BaseKvmCPU::serializeThread(CheckpointOut &cp, ThreadID tid) const
 {
-    if (DTRACE(Checkpoint)) {
+    if (debug::Checkpoint) {
         DPRINTF(Checkpoint, "KVM: Serializing thread %i:\n", tid);
         dump();
     }
@@ -334,7 +342,7 @@ BaseKvmCPU::drain()
             deschedule(tickEvent);
         _status = Idle;
 
-        M5_FALLTHROUGH;
+        GEM5_FALLTHROUGH;
       case Idle:
         // Idle, no need to drain
         assert(!tickEvent.scheduled());
@@ -1082,8 +1090,8 @@ BaseKvmCPU::doMMIOAccess(Addr paddr, void *data, int size, bool write)
     // before they are inserted into the memory system. This enables
     // APIC accesses on x86 and m5ops where supported through a MMIO
     // interface.
-    BaseTLB::Mode tlb_mode(write ? BaseTLB::Write : BaseTLB::Read);
-    Fault fault(tc->getMMUPtr()->finalizePhysical(mmio_req, tc, tlb_mode));
+    BaseMMU::Mode access_type(write ? BaseMMU::Write : BaseMMU::Read);
+    Fault fault(tc->getMMUPtr()->finalizePhysical(mmio_req, tc, access_type));
     if (fault != NoFault)
         warn("Finalization of MMIO address failed: %s\n", fault->name());
 
@@ -1359,3 +1367,5 @@ BaseKvmCPU::setupInstCounter(uint64_t period)
 
     activeInstPeriod = period;
 }
+
+} // namespace gem5

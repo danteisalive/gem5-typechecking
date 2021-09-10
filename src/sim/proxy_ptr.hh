@@ -37,6 +37,9 @@
 #include "base/types.hh"
 #include "sim/guest_abi.hh"
 
+namespace gem5
+{
+
 template <typename Proxy>
 class ProxyPtrBuffer
 {
@@ -354,7 +357,8 @@ operator + (A a, const ProxyPtr<T, Proxy> &other)
     return other + a;
 }
 
-namespace GuestABI
+GEM5_DEPRECATED_NAMESPACE(GuestABI, guest_abi);
+namespace guest_abi
 {
 
 template <typename ABI, typename T, typename Proxy>
@@ -379,7 +383,7 @@ struct Argument<ABI, ConstProxyPtr<T, Proxy>>
     }
 };
 
-} // namespace GuestABI
+} // namespace guest_abi
 
 template <typename T, typename Proxy>
 std::ostream &
@@ -395,5 +399,7 @@ template <typename T>
 using ConstVPtr = ConstProxyPtr<T, SETranslatingPortProxy>;
 template <typename T=void>
 using VPtr = ProxyPtr<T, SETranslatingPortProxy>;
+
+} // namespace gem5
 
 #endif // __SIM_PROXY_PTR_HH__

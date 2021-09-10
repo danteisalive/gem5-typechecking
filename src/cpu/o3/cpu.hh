@@ -50,61 +50,58 @@
 #include <vector>
 
 #include "arch/generic/types.hh"
-#include "arch/types.hh"
+#include "arch/pcstate.hh"
 #include "base/statistics.hh"
 #include "config/the_isa.hh"
 #include "cpu/o3/comm.hh"
-#include "cpu/o3/cpu_policy.hh"
+#include "cpu/o3/commit.hh"
+#include "cpu/o3/decode.hh"
+#include "cpu/o3/dyn_inst_ptr.hh"
+#include "cpu/o3/fetch.hh"
+#include "cpu/o3/free_list.hh"
+#include "cpu/o3/iew.hh"
+#include "cpu/o3/limits.hh"
+#include "cpu/o3/rename.hh"
+#include "cpu/o3/rob.hh"
 #include "cpu/o3/scoreboard.hh"
 #include "cpu/o3/thread_state.hh"
 #include "cpu/activity.hh"
 #include "cpu/base.hh"
 #include "cpu/simple_thread.hh"
 #include "cpu/timebuf.hh"
-#include "params/DerivO3CPU.hh"
+#include "params/O3CPU.hh"
 #include "sim/process.hh"
+
+namespace gem5
+{
 
 template <class>
 class Checker;
 class ThreadContext;
-template <class>
-class O3ThreadContext;
 
 class Checkpoint;
 class Process;
 
-struct BaseCPUParams;
-
-class BaseO3CPU : public BaseCPU
+namespace o3
 {
-    //Stuff that's pretty ISA independent will go here.
-  public:
-    BaseO3CPU(const BaseCPUParams &params);
-};
+
+class ThreadContext;
 
 /**
- * FullO3CPU class, has each of the stages (fetch through commit)
+ * O3CPU class, has each of the stages (fetch through commit)
  * within it, as well as all of the time buffers between stages.  The
  * tick() function for the CPU is defined here.
  */
-template <class Impl>
-class FullO3CPU : public BaseO3CPU
+class CPU : public BaseCPU
 {
   public:
-    // Typedefs from the Impl here.
-    typedef typename Impl::CPUPol CPUPolicy;
-    typedef typename Impl::DynInstPtr DynInstPtr;
-    typedef typename Impl::O3CPU O3CPU;
+    typedef std::list<DynInstPtr>::iterator ListIt;
 
-    typedef O3ThreadState<Impl> ImplState;
-    typedef O3ThreadState<Impl> Thread;
-
-    typedef typename std::list<DynInstPtr>::iterator ListIt;
-
-    friend class O3ThreadContext<Impl>;
+    friend class ThreadContext;
 
   public:
-    enum Status {
+    enum Status
+    {
         Running,
         Idle,
         Halted,
@@ -113,7 +110,7 @@ class FullO3CPU : public BaseO3CPU
     };
 
     BaseMMU *mmu;
-    using LSQRequest = typename LSQ<Impl>::LSQRequest;
+    using LSQRequest = LSQ::LSQRequest;
 
     /** Overall CPU status. */
     Status _status;
@@ -171,9 +168,7 @@ class FullO3CPU : public BaseO3CPU
 
   public:
     /** Constructs a CPU with the given parameters. */
-    FullO3CPU(const DerivO3CPUParams &params);
-    /** Destructor. */
-    ~FullO3CPU();
+    CPU(const O3CPUParams &params);
 
     ProbePointArg<PacketPtr> *ppInstAccessComplete;
     ProbePointArg<std::pair<DynInstPtr, PacketPtr> > *ppDataAccessComplete;
@@ -339,42 +334,11 @@ class FullO3CPU : public BaseO3CPU
     TheISA::VecRegContainer& getWritableVecReg(PhysRegIdPtr reg_idx);
 
     /** Returns current vector renaming mode */
-    Enums::VecRegRenameMode vecRenameMode() const { return vecMode; }
+    enums::VecRegRenameMode vecRenameMode() const { return vecMode; }
 
     /** Sets the current vector renaming mode */
-    void vecRenameMode(Enums::VecRegRenameMode vec_mode)
+    void vecRenameMode(enums::VecRegRenameMode vec_mode)
     { vecMode = vec_mode; }
-
-    /**
-     * Read physical vector register lane
-     */
-    template<typename VE, int LaneIdx>
-    VecLaneT<VE, true>
-    readVecLane(PhysRegIdPtr phys_reg) const
-    {
-        cpuStats.vecRegfileReads++;
-        return regFile.readVecLane<VE, LaneIdx>(phys_reg);
-    }
-
-    /**
-     * Read physical vector register lane
-     */
-    template<typename VE>
-    VecLaneT<VE, true>
-    readVecLane(PhysRegIdPtr phys_reg) const
-    {
-        cpuStats.vecRegfileReads++;
-        return regFile.readVecLane<VE>(phys_reg);
-    }
-
-    /** Write a lane of the destination vector register. */
-    template<typename LD>
-    void
-    setVecLane(PhysRegIdPtr phys_reg, const LD& val)
-    {
-        cpuStats.vecRegfileWrites++;
-        return regFile.setVecLane(phys_reg, val);
-    }
 
     const TheISA::VecElem& readVecElem(PhysRegIdPtr reg_idx) const;
 
@@ -406,27 +370,6 @@ class FullO3CPU : public BaseO3CPU
         readArchVecReg(int reg_idx, ThreadID tid) const;
     /** Read architectural vector register for modification. */
     TheISA::VecRegContainer& getWritableArchVecReg(int reg_idx, ThreadID tid);
-
-    /** Read architectural vector register lane. */
-    template<typename VE>
-    VecLaneT<VE, true>
-    readArchVecLane(int reg_idx, int lId, ThreadID tid) const
-    {
-        PhysRegIdPtr phys_reg = commitRenameMap[tid].lookup(
-                    RegId(VecRegClass, reg_idx));
-        return readVecLane<VE>(phys_reg);
-    }
-
-
-    /** Write a lane of the destination vector register. */
-    template<typename LD>
-    void
-    setArchVecLane(int reg_idx, int lId, ThreadID tid, const LD& val)
-    {
-        PhysRegIdPtr phys_reg = commitRenameMap[tid].lookup(
-                    RegId(VecRegClass, reg_idx));
-        setVecLane(phys_reg, val);
-    }
 
     const TheISA::VecElem& readArchVecElem(const RegIndex& reg_idx,
             const ElemIndex& ldx, ThreadID tid) const;
@@ -501,7 +444,7 @@ class FullO3CPU : public BaseO3CPU
     void removeInstsUntil(const InstSeqNum &seq_num, ThreadID tid);
 
     /** Removes the instruction pointed to by the iterator. */
-    inline void squashInstIt(const ListIt &instIt, ThreadID tid);
+    void squashInstIt(const ListIt &instIt, ThreadID tid);
 
     /** Cleans up all instructions on the remove list. */
     void cleanUpRemovedInsts();
@@ -537,37 +480,37 @@ class FullO3CPU : public BaseO3CPU
 
   protected:
     /** The fetch stage. */
-    typename CPUPolicy::Fetch fetch;
+    Fetch fetch;
 
     /** The decode stage. */
-    typename CPUPolicy::Decode decode;
+    Decode decode;
 
     /** The dispatch stage. */
-    typename CPUPolicy::Rename rename;
+    Rename rename;
 
     /** The issue/execute/writeback stages. */
-    typename CPUPolicy::IEW iew;
+    IEW iew;
 
     /** The commit stage. */
-    typename CPUPolicy::Commit commit;
+    Commit commit;
 
     /** The rename mode of the vector registers */
-    Enums::VecRegRenameMode vecMode;
+    enums::VecRegRenameMode vecMode;
 
     /** The register file. */
     PhysRegFile regFile;
 
     /** The free list. */
-    typename CPUPolicy::FreeList freeList;
+    UnifiedFreeList freeList;
 
     /** The rename map. */
-    typename CPUPolicy::RenameMap renameMap[Impl::MaxThreads];
+    UnifiedRenameMap renameMap[MaxThreads];
 
     /** The commit rename map. */
-    typename CPUPolicy::RenameMap commitRenameMap[Impl::MaxThreads];
+    UnifiedRenameMap commitRenameMap[MaxThreads];
 
     /** The re-order buffer. */
-    typename CPUPolicy::ROB rob;
+    ROB rob;
 
     /** Active Threads List */
     std::list<ThreadID> activeThreads;
@@ -589,26 +532,15 @@ class FullO3CPU : public BaseO3CPU
      *  activateStage() or deactivateStage(), they can specify which stage
      *  is being activated/deactivated.
      */
-    enum StageIdx {
+    enum StageIdx
+    {
         FetchIdx,
         DecodeIdx,
         RenameIdx,
         IEWIdx,
         CommitIdx,
-        NumStages };
-
-    /** Typedefs from the Impl to get the structs that each of the
-     *  time buffers should use.
-     */
-    typedef typename CPUPolicy::TimeStruct TimeStruct;
-
-    typedef typename CPUPolicy::FetchStruct FetchStruct;
-
-    typedef typename CPUPolicy::DecodeStruct DecodeStruct;
-
-    typedef typename CPUPolicy::RenameStruct RenameStruct;
-
-    typedef typename CPUPolicy::IEWStruct IEWStruct;
+        NumStages
+    };
 
     /** The main time buffer to do backwards communication. */
     TimeBuffer<TimeStruct> timeBuffer;
@@ -654,26 +586,26 @@ class FullO3CPU : public BaseO3CPU
 
   public:
     /** Returns a pointer to a thread context. */
-    ThreadContext *
+    gem5::ThreadContext *
     tcBase(ThreadID tid)
     {
         return thread[tid]->getTC();
     }
 
     /** The global sequence number counter. */
-    InstSeqNum globalSeqNum;//[Impl::MaxThreads];
+    InstSeqNum globalSeqNum;//[MaxThreads];
 
     /** Pointer to the checker, which can dynamically verify
      * instruction results at run time.  This can be set to NULL if it
      * is not being used.
      */
-    Checker<Impl> *checker;
+    gem5::Checker<DynInstPtr> *checker;
 
     /** Pointer to the system. */
     System *system;
 
     /** Pointers to all of the threads in the CPU. */
-    std::vector<Thread *> thread;
+    std::vector<ThreadState *> thread;
 
     /** Threads Scheduled to Enter CPU */
     std::list<int> cpuWaitList;
@@ -705,27 +637,27 @@ class FullO3CPU : public BaseO3CPU
     /** CPU read function, forwards read to LSQ. */
     Fault read(LSQRequest* req, int load_idx)
     {
-        return this->iew.ldstQueue.read(req, load_idx);
+        return iew.ldstQueue.read(req, load_idx);
     }
 
     /** CPU write function, forwards write to LSQ. */
     Fault write(LSQRequest* req, uint8_t *data, int store_idx)
     {
-        return this->iew.ldstQueue.write(req, data, store_idx);
+        return iew.ldstQueue.write(req, data, store_idx);
     }
 
     /** Used by the fetch unit to get a hold of the instruction port. */
     Port &
     getInstPort() override
     {
-        return this->fetch.getInstPort();
+        return fetch.getInstPort();
     }
 
     /** Get the dcache port (used to find block size for translations). */
     Port &
     getDataPort() override
     {
-        return this->iew.ldstQueue.getDataPort();
+        return iew.ldstQueue.getDataPort();
     }
 
     /** Get the mcache port */
@@ -735,49 +667,50 @@ class FullO3CPU : public BaseO3CPU
         return this->fetch.getMetaPort();
     }
 
-    struct FullO3CPUStats : public Stats::Group
+
+    struct CPUStats : public statistics::Group
     {
-        FullO3CPUStats(FullO3CPU *cpu);
+        CPUStats(CPU *cpu);
 
         /** Stat for total number of times the CPU is descheduled. */
-        Stats::Scalar timesIdled;
+        statistics::Scalar timesIdled;
         /** Stat for total number of cycles the CPU spends descheduled. */
-        Stats::Scalar idleCycles;
+        statistics::Scalar idleCycles;
         /** Stat for total number of cycles the CPU spends descheduled due to a
          * quiesce operation or waiting for an interrupt. */
-        Stats::Scalar quiesceCycles;
+        statistics::Scalar quiesceCycles;
         /** Stat for the number of committed instructions per thread. */
-        Stats::Vector committedInsts;
+        statistics::Vector committedInsts;
         /** Stat for the number of committed ops (including micro ops) per
          *  thread. */
-        Stats::Vector committedOps;
+        statistics::Vector committedOps;
         /** Stat for the CPI per thread. */
-        Stats::Formula cpi;
+        statistics::Formula cpi;
         /** Stat for the total CPI. */
-        Stats::Formula totalCpi;
+        statistics::Formula totalCpi;
         /** Stat for the IPC per thread. */
-        Stats::Formula ipc;
+        statistics::Formula ipc;
         /** Stat for the total IPC. */
-        Stats::Formula totalIpc;
+        statistics::Formula totalIpc;
 
         //number of integer register file accesses
-        Stats::Scalar intRegfileReads;
-        Stats::Scalar intRegfileWrites;
+        statistics::Scalar intRegfileReads;
+        statistics::Scalar intRegfileWrites;
         //number of float register file accesses
-        Stats::Scalar fpRegfileReads;
-        Stats::Scalar fpRegfileWrites;
+        statistics::Scalar fpRegfileReads;
+        statistics::Scalar fpRegfileWrites;
         //number of vector register file accesses
-        mutable Stats::Scalar vecRegfileReads;
-        Stats::Scalar vecRegfileWrites;
+        mutable statistics::Scalar vecRegfileReads;
+        statistics::Scalar vecRegfileWrites;
         //number of predicate register file accesses
-        mutable Stats::Scalar vecPredRegfileReads;
-        Stats::Scalar vecPredRegfileWrites;
+        mutable statistics::Scalar vecPredRegfileReads;
+        statistics::Scalar vecPredRegfileWrites;
         //number of CC register file accesses
-        Stats::Scalar ccRegfileReads;
-        Stats::Scalar ccRegfileWrites;
+        statistics::Scalar ccRegfileReads;
+        statistics::Scalar ccRegfileWrites;
         //number of misc
-        Stats::Scalar miscRegfileReads;
-        Stats::Scalar miscRegfileWrites;
+        statistics::Scalar miscRegfileReads;
+        statistics::Scalar miscRegfileWrites;
     } cpuStats;
 
   public:
@@ -785,5 +718,8 @@ class FullO3CPU : public BaseO3CPU
     void htmSendAbortSignal(ThreadID tid, uint64_t htm_uid,
                             HtmFailureFaultCause cause);
 };
+
+} // namespace o3
+} // namespace gem5
 
 #endif // __CPU_O3_CPU_HH__

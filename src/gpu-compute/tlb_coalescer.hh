@@ -40,7 +40,7 @@
 #include <vector>
 
 #include "arch/generic/tlb.hh"
-#include "arch/isa.hh"
+#include "arch/x86/isa.hh"
 #include "arch/x86/pagetable.hh"
 #include "arch/x86/regs/segment.hh"
 #include "base/logging.hh"
@@ -50,6 +50,9 @@
 #include "mem/request.hh"
 #include "params/TLBCoalescer.hh"
 #include "sim/clocked_object.hh"
+
+namespace gem5
+{
 
 class BaseTLB;
 class Packet;
@@ -97,7 +100,7 @@ class TLBCoalescer : public ClockedObject
      * option is to change it to curTick(), so we coalesce based
      * on the receive time.
      */
-    typedef std::unordered_map<int64_t, std::vector<coalescedReq>>
+    typedef std::map<int64_t, std::vector<coalescedReq>>
         CoalescingFIFO;
 
     CoalescingFIFO coalescerFIFO;
@@ -195,27 +198,29 @@ class TLBCoalescer : public ClockedObject
     std::queue<Addr> cleanupQueue;
 
   protected:
-    struct TLBCoalescerStats : public Stats::Group
+    struct TLBCoalescerStats : public statistics::Group
     {
-        TLBCoalescerStats(Stats::Group *parent);
+        TLBCoalescerStats(statistics::Group *parent);
 
         // number of packets the coalescer receives
-        Stats::Scalar uncoalescedAccesses;
+        statistics::Scalar uncoalescedAccesses;
         // number packets the coalescer send to the TLB
-        Stats::Scalar coalescedAccesses;
+        statistics::Scalar coalescedAccesses;
 
         // Number of cycles the coalesced requests spend waiting in
         // coalescerFIFO. For each packet the coalescer receives we take into
         // account the number of all uncoalesced requests this pkt "represents"
-        Stats::Scalar queuingCycles;
+        statistics::Scalar queuingCycles;
 
         // On average how much time a request from the
         // uncoalescedAccesses that reaches the TLB
         // spends waiting?
-        Stats::Scalar localqueuingCycles;
+        statistics::Scalar localqueuingCycles;
         // localqueuingCycles/uncoalescedAccesses
-        Stats::Formula localLatency;
+        statistics::Formula localLatency;
     } stats;
 };
+
+} // namespace gem5
 
 #endif // __TLB_COALESCER_HH__

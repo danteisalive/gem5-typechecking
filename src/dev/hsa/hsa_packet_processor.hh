@@ -39,7 +39,7 @@
 #include <vector>
 
 #include "base/types.hh"
-#include "dev/dma_device.hh"
+#include "dev/dma_virt_device.hh"
 #include "dev/hsa/hsa.h"
 #include "dev/hsa/hsa_queue.hh"
 #include "params/HSAPacketProcessor.hh"
@@ -52,10 +52,14 @@
 // HSA runtime supports only 5 signals per barrier packet
 #define NumSignalsPerBarrier 5
 
+namespace gem5
+{
+
 // Ideally, each queue should store this status and
 // the processPkt() should make decisions based on that
 // status variable.
-typedef enum {
+enum Q_STATE
+{
     UNBLOCKED = 0, // Unblocked queue, can submit packets.
     BLOCKED_BBIT,  // Queue blocked by barrier bit.
                    // Can submit packet packets after
@@ -63,13 +67,14 @@ typedef enum {
     BLOCKED_BPKT,  // Queue blocked by barrier packet.
                    // Can submit packet packets after
                    // barrier packet completes.
-} Q_STATE;
+};
 
-class HSADevice;
+class GPUCommandProcessor;
 class HWScheduler;
 
 // Our internal representation of an HSA queue
-class HSAQueueDescriptor {
+class HSAQueueDescriptor
+{
     public:
         uint64_t     basePointer;
         uint64_t     doorbellPointer;
@@ -84,7 +89,7 @@ class HSAQueueDescriptor {
                            uint64_t hri_ptr, uint32_t size)
           : basePointer(base_ptr), doorbellPointer(db_ptr),
             writeIndex(0), readIndex(0),
-            numElts(size), hostReadIndexPtr(hri_ptr),
+            numElts(size / AQL_PACKET_SIZE), hostReadIndexPtr(hri_ptr),
             stalledOnDmaBufAvailability(false),
             dmaInProgress(false)
         {  }
@@ -97,6 +102,13 @@ class HSAQueueDescriptor {
 
         uint64_t ptr(uint64_t ix)
         {
+            /**
+             * Sometimes queues report that their size is 512k, which would
+             * indicate numElts of 0x2000. However, they only have 256k
+             * mapped which means any index over 0x1000 will fail an
+             * address translation.
+             */
+            assert(ix % numElts < 0x1000);
             return basePointer +
                 ((ix % numElts) * objSize());
         }
@@ -111,7 +123,7 @@ class HSAQueueDescriptor {
  * FREE: Entry is empty
  * ALLOCATED: Entry has been allocated for a packet, but the DMA has not
  *            yet completed
- * SUBMITTED: Packet has been submitted to the HSADevice, but has not
+ * SUBMITTED: Packet has been submitted to the GPUCommandProcessor, but has not
  *            yet completed
  */
 class AQLRingBuffer
@@ -197,24 +209,24 @@ class AQLRingBuffer
      uint64_t compltnPending() { return (_dispIdx - _rdIdx); }
 };
 
-typedef struct QueueContext {
+struct QCntxt
+{
     HSAQueueDescriptor* qDesc;
     AQLRingBuffer* aqlBuf;
     // used for HSA packets that enforce synchronization with barrier bit
     bool barrierBit;
-    QueueContext(HSAQueueDescriptor* q_desc,
-                 AQLRingBuffer* aql_buf)
-                 : qDesc(q_desc), aqlBuf(aql_buf), barrierBit(false)
+    QCntxt(HSAQueueDescriptor* q_desc, AQLRingBuffer* aql_buf) :
+        qDesc(q_desc), aqlBuf(aql_buf), barrierBit(false)
     {}
-    QueueContext() : qDesc(NULL), aqlBuf(NULL), barrierBit(false) {}
-} QCntxt;
+    QCntxt() : qDesc(NULL), aqlBuf(NULL), barrierBit(false) {}
+};
 
-class HSAPacketProcessor: public DmaDevice
+class HSAPacketProcessor: public DmaVirtDevice
 {
     friend class HWScheduler;
   protected:
     typedef void (DmaDevice::*DmaFnPtr)(Addr, int, Event*, uint8_t*, Tick);
-    HSADevice *hsa_device;
+    GPUCommandProcessor *gpu_device;
     HWScheduler *hwSchdlr;
 
     // Structure to store the read values of dependency signals
@@ -278,15 +290,6 @@ class HSAPacketProcessor: public DmaDevice
     // Keeps track of queueDescriptors of registered queues
     std::vector<class RQLEntry *> regdQList;
 
-    void translateOrDie(Addr vaddr, Addr &paddr);
-    void dmaVirt(DmaFnPtr, Addr host_addr, unsigned size, Event *event,
-                 void *data, Tick delay = 0);
-
-    void dmaReadVirt(Addr host_addr, unsigned size, Event *event,
-                     void *data, Tick delay = 0);
-
-    void dmaWriteVirt(Addr host_addr, unsigned size, Event *event,
-                      void *data, Tick delay = 0);
     Q_STATE processPkt(void* pkt, uint32_t rl_idx, Addr host_pkt_addr);
     void displayQueueDescriptor(int pid, uint32_t rl_idx);
 
@@ -318,19 +321,20 @@ class HSAPacketProcessor: public DmaDevice
     typedef HSAPacketProcessorParams Params;
     HSAPacketProcessor(const Params &p);
     ~HSAPacketProcessor();
+    void translateOrDie(Addr vaddr, Addr &paddr) override;
     void setDeviceQueueDesc(uint64_t hostReadIndexPointer,
                             uint64_t basePointer,
                             uint64_t queue_id,
-                            uint32_t size);
-    void unsetDeviceQueueDesc(uint64_t queue_id);
-    void setDevice(HSADevice * dev);
+                            uint32_t size, int doorbellSize);
+    void unsetDeviceQueueDesc(uint64_t queue_id, int doorbellSize);
+    void setDevice(GPUCommandProcessor * dev);
     void updateReadIndex(int, uint32_t);
     void getCommandsFromHost(int pid, uint32_t rl_idx);
 
     // PIO interface
-    virtual Tick read(Packet*);
-    virtual Tick write(Packet*);
-    virtual AddrRangeList getAddrRanges() const;
+    virtual Tick read(Packet*) override;
+    virtual Tick write(Packet*) override;
+    virtual AddrRangeList getAddrRanges() const override;
     void finishPkt(void *pkt, uint32_t rl_idx);
     void finishPkt(void *pkt) { finishPkt(pkt, 0); }
     void schedAQLProcessing(uint32_t rl_idx);
@@ -340,37 +344,11 @@ class HSAPacketProcessor: public DmaDevice
                                            hsa_signal_value_t signal);
     void sendCompletionSignal(hsa_signal_value_t signal);
 
-    class DepSignalsReadDmaEvent : public Event
-    {
-      protected:
-        SignalState *signalState;
-      public:
-        DepSignalsReadDmaEvent(SignalState *ss)
-            : Event(Default_Pri, AutoDelete), signalState(ss)
-        {}
-        virtual void process() { signalState->handleReadDMA(); }
-        virtual const char *description() const;
-    };
-
-    /**
-     * this event is used to update the read_disp_id field (the read pointer)
-     * of the MQD, which is how the host code knows the status of the HQD's
-     * read pointer
-     */
-    class UpdateReadDispIdDmaEvent : public Event
-    {
-      public:
-        UpdateReadDispIdDmaEvent();
-
-        void process() override { }
-        const char *description() const override;
-
-    };
-
     /**
      * Calls getCurrentEntry once the queueEntry has been dmaRead.
      */
-    struct dma_series_ctx {
+    struct dma_series_ctx
+    {
         // deal with the fact dma ops can complete out of issue order
         uint32_t pkts_ttl;
         uint32_t pkts_2_go;
@@ -387,24 +365,13 @@ class HSAPacketProcessor: public DmaDevice
         ~dma_series_ctx() {};
     };
 
-    class CmdQueueCmdDmaEvent : public Event
-    {
-      protected:
-        HSAPacketProcessor *hsaPP;
-        int pid;
-        bool isRead;
-        uint32_t ix_start;
-        uint num_pkts;
-        dma_series_ctx *series_ctx;
-        void *dest_4debug;
-
-      public:
-        CmdQueueCmdDmaEvent(HSAPacketProcessor *hsaPP, int pid, bool isRead,
-                            uint32_t dma_buf_ix, uint num_bufs,
-                            dma_series_ctx *series_ctx, void *dest_4debug);
-        virtual void process();
-        virtual const char *description() const;
-    };
+    void updateReadDispIdDma();
+    void cmdQueueCmdDma(HSAPacketProcessor *hsaPP, int pid, bool isRead,
+            uint32_t ix_start, unsigned num_pkts,
+            dma_series_ctx *series_ctx, void *dest_4debug);
+    void handleReadDMA();
 };
+
+} // namespace gem5
 
 #endif // __DEV_HSA_HSA_PACKET_PROCESSOR__

@@ -30,9 +30,11 @@
 
 #include <iomanip>
 
-#include "config/the_isa.hh"
 #include "cpu/exetrace.hh"
 #include "cpu/static_inst.hh"
+
+namespace gem5
+{
 
 namespace Trace {
 
@@ -51,3 +53,4 @@ Trace::IntelTraceRecord::dump()
 }
 
 } // namespace Trace
+} // namespace gem5

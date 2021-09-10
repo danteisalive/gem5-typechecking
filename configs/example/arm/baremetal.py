@@ -95,8 +95,7 @@ def create(args):
 
     platform = ObjectList.platform_list.get(args.machine_type)
 
-    system = devices.simpleSystem(ArmSystem,
-                                  want_caches,
+    system = devices.SimpleSystem(want_caches,
                                   args.mem_size,
                                   platform=platform(),
                                   mem_mode=mem_mode,
@@ -135,8 +134,7 @@ def create(args):
     # Create a cache hierarchy for the cluster. We are assuming that
     # clusters have core-private L1 caches and an L2 that's shared
     # within the cluster.
-    for cluster in system.cpu_cluster:
-        system.addCaches(want_caches, last_cache_level=2)
+    system.addCaches(want_caches, last_cache_level=2)
 
     # Setup gem5's minimal Linux boot loader.
     system.auto_reset_addr = True

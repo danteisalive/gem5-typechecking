@@ -50,6 +50,9 @@
 #include "base/loader/symtab.hh"
 #include "cpu/reg_class.hh"
 
+namespace gem5
+{
+
 namespace ArmISA
 {
 // Shift Rm by an immediate value
@@ -393,7 +396,7 @@ ArmStaticInst::printMnemonic(std::ostream &os,
 
 void
 ArmStaticInst::printTarget(std::ostream &os, Addr target,
-                           const Loader::SymbolTable *symtab) const
+                           const loader::SymbolTable *symtab) const
 {
     if (symtab) {
         auto it = symtab->findNearest(target);
@@ -475,7 +478,7 @@ ArmStaticInst::printCondition(std::ostream &os,
 
 void
 ArmStaticInst::printMemSymbol(std::ostream &os,
-                              const Loader::SymbolTable *symtab,
+                              const loader::SymbolTable *symtab,
                               const std::string &prefix,
                               const Addr addr,
                               const std::string &suffix) const
@@ -621,7 +624,7 @@ ArmStaticInst::printDataInst(std::ostream &os, bool withImm,
 
 std::string
 ArmStaticInst::generateDisassembly(Addr pc,
-                                   const Loader::SymbolTable *symtab) const
+                                   const loader::SymbolTable *symtab) const
 {
     std::stringstream ss;
     printMnemonic(ss);
@@ -1219,4 +1222,5 @@ ArmStaticInst::getCurSveVecLenInBits(ThreadContext *tc)
     return isa->getCurSveVecLenInBits();
 }
 
-}
+} // namespace ArmISA
+} // namespace gem5

@@ -47,12 +47,15 @@
 
 #include "arch/generic/htm.hh"
 #include "arch/generic/isa.hh"
-#include "arch/registers.hh"
-#include "arch/types.hh"
+#include "arch/pcstate.hh"
+#include "arch/vecregs.hh"
 #include "base/types.hh"
 #include "config/the_isa.hh"
 #include "cpu/pc_event.hh"
 #include "cpu/reg_class.hh"
+
+namespace gem5
+{
 
 // @todo: Figure out a more architecture independent way to obtain the ITB and
 // DTB pointers.
@@ -68,6 +71,8 @@ class Checkpoint;
 class PortProxy;
 class Process;
 class System;
+class Packet;
+using PacketPtr = Packet *;
 
 /**
  * ThreadContext is the external interface to all thread state for
@@ -142,9 +147,9 @@ class ThreadContext : public PCEventScope
 
     virtual System *getSystemPtr() = 0;
 
-    virtual PortProxy &getPhysProxy() = 0;
-
     virtual PortProxy &getVirtProxy() = 0;
+
+    virtual void sendFunctional(PacketPtr pkt);
 
     /**
      * Initialise the physical and virtual port proxies and tie them to
@@ -205,35 +210,6 @@ class ThreadContext : public PCEventScope
         readVecReg(const RegId& reg) const = 0;
     virtual TheISA::VecRegContainer& getWritableVecReg(const RegId& reg) = 0;
 
-    /** Vector Register Lane Interfaces. */
-    /** @{ */
-    /** Reads source vector 8bit operand. */
-    virtual ConstVecLane8
-    readVec8BitLaneReg(const RegId& reg) const = 0;
-
-    /** Reads source vector 16bit operand. */
-    virtual ConstVecLane16
-    readVec16BitLaneReg(const RegId& reg) const = 0;
-
-    /** Reads source vector 32bit operand. */
-    virtual ConstVecLane32
-    readVec32BitLaneReg(const RegId& reg) const = 0;
-
-    /** Reads source vector 64bit operand. */
-    virtual ConstVecLane64
-    readVec64BitLaneReg(const RegId& reg) const = 0;
-
-    /** Write a lane of the destination vector register. */
-    virtual void setVecLane(const RegId& reg,
-            const LaneData<LaneSize::Byte>& val) = 0;
-    virtual void setVecLane(const RegId& reg,
-            const LaneData<LaneSize::TwoByte>& val) = 0;
-    virtual void setVecLane(const RegId& reg,
-            const LaneData<LaneSize::FourByte>& val) = 0;
-    virtual void setVecLane(const RegId& reg,
-            const LaneData<LaneSize::EightByte>& val) = 0;
-    /** @} */
-
     virtual const TheISA::VecElem& readVecElem(const RegId& reg) const = 0;
 
     virtual const TheISA::VecPredRegContainer& readVecPredReg(
@@ -292,9 +268,6 @@ class ThreadContext : public PCEventScope
     virtual unsigned readStCondFailures() const = 0;
 
     virtual void setStCondFailures(unsigned sc_failures) = 0;
-
-    // Same with st cond failures.
-    virtual Counter readFuncExeInst() const = 0;
 
     // This function exits the thread context in the CPU and returns
     // 1 if the CPU has no more active threads (meaning it's OK to exit);
@@ -378,5 +351,7 @@ void unserialize(ThreadContext &tc, CheckpointIn &cp);
  * @param old_tc Source ThreadContext.
  */
 void takeOverFrom(ThreadContext &new_tc, ThreadContext &old_tc);
+
+} // namespace gem5
 
 #endif

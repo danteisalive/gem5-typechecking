@@ -44,11 +44,17 @@
 
 #include <algorithm>
 
-#include "arch/types.hh"
-#include "arch/utility.hh"
+#include "arch/pcstate.hh"
+#include "base/compiler.hh"
 #include "base/trace.hh"
 #include "config/the_isa.hh"
 #include "debug/Branch.hh"
+
+namespace gem5
+{
+
+namespace branch_prediction
+{
 
 BPredUnit::BPredUnit(const Params &params)
     : SimObject(params),
@@ -67,35 +73,39 @@ BPredUnit::BPredUnit(const Params &params)
         r.init(params.RASSize);
 }
 
-BPredUnit::BPredUnitStats::BPredUnitStats(Stats::Group *parent)
-    : Stats::Group(parent),
-      ADD_STAT(lookups, UNIT_COUNT, "Number of BP lookups"),
-      ADD_STAT(condPredicted, UNIT_COUNT,
+BPredUnit::BPredUnitStats::BPredUnitStats(statistics::Group *parent)
+    : statistics::Group(parent),
+      ADD_STAT(lookups, statistics::units::Count::get(), "Number of BP lookups"),
+      ADD_STAT(condPredicted, statistics::units::Count::get(),
                "Number of conditional branches predicted"),
-      ADD_STAT(condIncorrect, UNIT_COUNT,
+      ADD_STAT(condIncorrect, statistics::units::Count::get(),
                "Number of conditional branches incorrect"),
-      ADD_STAT(BTBLookups, UNIT_COUNT, "Number of BTB lookups"),
-      ADD_STAT(BTBHits, UNIT_COUNT, "Number of BTB hits"),
-      ADD_STAT(BTBHitRatio, UNIT_RATIO, "BTB Hit Ratio", BTBHits / BTBLookups),
-      ADD_STAT(RASUsed, UNIT_COUNT,
+      ADD_STAT(BTBLookups, statistics::units::Count::get(),
+               "Number of BTB lookups"),
+      ADD_STAT(BTBHits, statistics::units::Count::get(), "Number of BTB hits"),
+      ADD_STAT(BTBHitRatio, statistics::units::Ratio::get(), "BTB Hit Ratio",
+               BTBHits / BTBLookups),
+      ADD_STAT(RASUsed, statistics::units::Count::get(),
                "Number of times the RAS was used to get a target."),
-      ADD_STAT(RASIncorrect, UNIT_COUNT,
+      ADD_STAT(RASIncorrect, statistics::units::Count::get(),
                "Number of incorrect RAS predictions."),
-      ADD_STAT(indirectLookups, UNIT_COUNT,
+      ADD_STAT(indirectLookups, statistics::units::Count::get(),
                "Number of indirect predictor lookups."),
-      ADD_STAT(indirectHits, UNIT_COUNT, "Number of indirect target hits."),
-      ADD_STAT(indirectMisses, UNIT_COUNT, "Number of indirect misses."),
-      ADD_STAT(indirectMispredicted, UNIT_COUNT,
+      ADD_STAT(indirectHits, statistics::units::Count::get(),
+               "Number of indirect target hits."),
+      ADD_STAT(indirectMisses, statistics::units::Count::get(),
+               "Number of indirect misses."),
+      ADD_STAT(indirectMispredicted, statistics::units::Count::get(),
                "Number of mispredicted indirect branches.")
 {
     BTBHitRatio.precision(6);
 }
 
-ProbePoints::PMUUPtr
+probing::PMUUPtr
 BPredUnit::pmuProbePoint(const char *name)
 {
-    ProbePoints::PMUUPtr ptr;
-    ptr.reset(new ProbePoints::PMU(getProbeManager(), name));
+    probing::PMUUPtr ptr;
+    ptr.reset(new probing::PMU(getProbeManager(), name));
 
     return ptr;
 }
@@ -112,7 +122,7 @@ BPredUnit::drainSanityCheck() const
 {
     // We shouldn't have any outstanding requests when we resume from
     // a drained system.
-    for (M5_VAR_USED const auto& ph : predHist)
+    for (GEM5_VAR_USED const auto& ph : predHist)
         assert(ph.empty());
 }
 
@@ -170,7 +180,7 @@ BPredUnit::predict(const StaticInstPtr &inst, const InstSeqNum &seqNum,
             // If it's a function return call, then look up the address
             // in the RAS.
             TheISA::PCState rasTop = RAS[tid].top();
-            target = TheISA::buildRetPC(pc, rasTop);
+            target = inst->buildRetPC(pc, rasTop);
 
             // Record the top entry of the RAS, and its index.
             predict_record.usedRAS = true;
@@ -227,7 +237,7 @@ BPredUnit::predict(const StaticInstPtr &inst, const InstSeqNum &seqNum,
                         RAS[tid].pop();
                         predict_record.pushedRAS = false;
                     }
-                    TheISA::advancePC(target, inst);
+                    inst->advancePC(target);
                 }
             } else {
                 predict_record.wasIndirect = true;
@@ -256,7 +266,7 @@ BPredUnit::predict(const StaticInstPtr &inst, const InstSeqNum &seqNum,
                         RAS[tid].pop();
                         predict_record.pushedRAS = false;
                     }
-                    TheISA::advancePC(target, inst);
+                    inst->advancePC(target);
                 }
                 iPred->recordIndirect(pc.instAddr(), target.instAddr(), seqNum,
                         tid);
@@ -266,7 +276,7 @@ BPredUnit::predict(const StaticInstPtr &inst, const InstSeqNum &seqNum,
         if (inst->isReturn()) {
            predict_record.wasReturn = true;
         }
-        TheISA::advancePC(target, inst);
+        inst->advancePC(target);
     }
     predict_record.target = target.instAddr();
 
@@ -514,3 +524,5 @@ BPredUnit::dump()
     }
 }
 
+} // namespace branch_prediction
+} // namespace gem5

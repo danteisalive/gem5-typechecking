@@ -38,10 +38,8 @@
 #include <string>
 #include <unordered_map>
 
-#include "arch/utility.hh"
 #include "base/chunk_generator.hh"
 #include "base/trace.hh"
-#include "config/the_isa.hh"
 #include "cpu/thread_context.hh"
 #include "dev/net/dist_iface.hh"
 #include "mem/page_table.hh"
@@ -52,6 +50,9 @@
 #include "sim/syscall_debug_macros.hh"
 #include "sim/syscall_desc.hh"
 #include "sim/system.hh"
+
+namespace gem5
+{
 
 void
 warnUnsupportedOS(std::string syscall_name)
@@ -190,6 +191,16 @@ exitImpl(SyscallDesc *desc, ThreadContext *tc, bool group, int status)
             if ((*p->fds)[i])
                 p->fds->closeFDEntry(i);
         }
+    }
+
+    /**
+     * If we were a thread created by a clone with vfork set, wake up
+     * the thread that created us
+     */
+    if (!p->vforkContexts.empty()) {
+        ThreadContext *vtc = sys->threads[p->vforkContexts.front()];
+        assert(vtc->status() == ThreadContext::Suspended);
+        vtc->activate();
     }
 
     tc->halt();
@@ -715,7 +726,7 @@ dup2Func(SyscallDesc *desc, ThreadContext *tc, int old_tgt_fd, int new_tgt_fd)
 
 SyscallReturn
 fcntlFunc(SyscallDesc *desc, ThreadContext *tc,
-          int tgt_fd, int cmd, GuestABI::VarArgs<int> varargs)
+          int tgt_fd, int cmd, guest_abi::VarArgs<int> varargs)
 {
     auto p = tc->getProcessPtr();
 
@@ -1113,7 +1124,8 @@ SyscallReturn
 getdentsFunc(SyscallDesc *desc, ThreadContext *tc,
              int tgt_fd, VPtr<> buf_ptr, unsigned count)
 {
-    typedef struct linux_dirent {
+    typedef struct linux_dirent
+    {
         unsigned long d_ino;
         unsigned long d_off;
         unsigned short d_reclen;
@@ -1130,7 +1142,8 @@ SyscallReturn
 getdents64Func(SyscallDesc *desc, ThreadContext *tc,
                int tgt_fd, VPtr<> buf_ptr, unsigned count)
 {
-    typedef struct linux_dirent64 {
+    typedef struct linux_dirent64
+    {
         ino64_t d_ino;
         off64_t d_off;
         unsigned short d_reclen;
@@ -1517,7 +1530,8 @@ getsockoptFunc(SyscallDesc *desc, ThreadContext *tc,
                VPtr<> lenPtr)
 {
     // union of all possible return value types from getsockopt
-    union val {
+    union val
+    {
         int i_val;
         long l_val;
         struct linger linger_val;
@@ -1649,3 +1663,5 @@ getcpuFunc(SyscallDesc *desc, ThreadContext *tc,
 
     return 0;
 }
+
+} // namespace gem5

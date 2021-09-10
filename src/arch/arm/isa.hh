@@ -42,19 +42,21 @@
 #define __ARCH_ARM_ISA_HH__
 
 #include "arch/arm/isa_device.hh"
-#include "arch/arm/miscregs.hh"
-#include "arch/arm/registers.hh"
+#include "arch/arm/regs/int.hh"
+#include "arch/arm/regs/misc.hh"
 #include "arch/arm/self_debug.hh"
 #include "arch/arm/system.hh"
 #include "arch/arm/tlb.hh"
 #include "arch/arm/types.hh"
 #include "arch/arm/utility.hh"
 #include "arch/generic/isa.hh"
-#include "arch/generic/traits.hh"
 #include "debug/Checkpoint.hh"
 #include "enums/DecoderFlavor.hh"
 #include "enums/VecRegRenameMode.hh"
 #include "sim/sim_object.hh"
+
+namespace gem5
+{
 
 struct ArmISAParams;
 struct DummyArmISADeviceParams;
@@ -70,8 +72,7 @@ namespace ArmISA
         ArmSystem *system;
 
         // Micro Architecture
-        const Enums::DecoderFlavor _decoderFlavor;
-        const Enums::VecRegRenameMode _vecRegRenameMode;
+        const enums::DecoderFlavor _decoderFlavor;
 
         /** Dummy device for to handle non-existing ISA devices */
         DummyISADevice dummyDevice;
@@ -114,7 +115,8 @@ namespace ArmISA
         SelfDebug * selfDebug;
 
         /** MiscReg metadata **/
-        struct MiscRegLUTEntry {
+        struct MiscRegLUTEntry
+        {
             uint32_t lower;  // Lower half mapped to this register
             uint32_t upper;  // Upper half mapped to this register
             uint64_t _reset; // value taken on reset (i.e. initialization)
@@ -138,7 +140,8 @@ namespace ArmISA
         /** Metadata table accessible via the value of the register */
         static std::vector<struct MiscRegLUTEntry> lookUpMiscReg;
 
-        class MiscRegLUTEntryInitializer {
+        class MiscRegLUTEntryInitializer
+        {
             struct MiscRegLUTEntry &entry;
             std::bitset<NUM_MISCREG_INFOS> &info;
             typedef const MiscRegLUTEntryInitializer& chain;
@@ -454,7 +457,7 @@ namespace ArmISA
 
         void initializeMiscRegMetadata();
 
-        RegVal miscRegs[NumMiscRegs];
+        RegVal miscRegs[NUM_MISCREGS];
         const IntRegIndex *intRegMap;
 
         void
@@ -512,9 +515,9 @@ namespace ArmISA
         void initID64(const ArmISAParams &p);
 
         void addressTranslation(TLB::ArmTranslationType tran_type,
-            BaseTLB::Mode mode, Request::Flags flags, RegVal val);
+            BaseMMU::Mode mode, Request::Flags flags, RegVal val);
         void addressTranslation64(TLB::ArmTranslationType tran_type,
-            BaseTLB::Mode mode, Request::Flags flags, RegVal val);
+            BaseMMU::Mode mode, Request::Flags flags, RegVal val);
 
       public:
         SelfDebug*
@@ -852,8 +855,17 @@ namespace ArmISA
 
         unsigned getCurSveVecLenInBitsAtReset() const { return sveVL * 128; }
 
-        static void zeroSveVecRegUpperPart(VecRegContainer &vc,
-                                           unsigned eCount);
+        template <typename Elem>
+        static void
+        zeroSveVecRegUpperPart(Elem *v, unsigned eCount)
+        {
+            static_assert(sizeof(Elem) <= sizeof(uint64_t),
+                    "Elem type is too large.");
+            eCount *= (sizeof(uint64_t) / sizeof(Elem));
+            for (int i = 16 / sizeof(Elem); i < eCount; ++i) {
+                v[i] = 0;
+            }
+        }
 
         void serialize(CheckpointOut &cp) const override;
         void unserialize(CheckpointIn &cp) override;
@@ -865,7 +877,7 @@ namespace ArmISA
         void takeOverFrom(ThreadContext *new_tc,
                           ThreadContext *old_tc) override;
 
-        Enums::DecoderFlavor decoderFlavor() const { return _decoderFlavor; }
+        enums::DecoderFlavor decoderFlavor() const { return _decoderFlavor; }
 
         /** Returns true if the ISA has a GICv3 cpu interface */
         bool haveGICv3CpuIfc() const
@@ -877,10 +889,16 @@ namespace ArmISA
             return gicv3CpuInterface != nullptr;
         }
 
-        Enums::VecRegRenameMode
-        vecRegRenameMode() const
+        enums::VecRegRenameMode
+        initVecRegRenameMode() const override
         {
-            return _vecRegRenameMode;
+            return highestELIs64 ? enums::Full : enums::Elem;
+        }
+
+        enums::VecRegRenameMode
+        vecRegRenameMode(ThreadContext *_tc) const override
+        {
+            return _tc->pcState().aarch64() ? enums::Full : enums::Elem;
         }
 
         PARAMS(ArmISA);
@@ -899,35 +917,11 @@ namespace ArmISA
             CPSR cpsr = miscRegs[MISCREG_CPSR];
             return ArmISA::inUserMode(cpsr);
         }
+
+        void copyRegsFrom(ThreadContext *src) override;
     };
-}
 
-template<>
-struct RenameMode<ArmISA::ISA>
-{
-    static Enums::VecRegRenameMode
-    init(const BaseISA* isa)
-    {
-        auto arm_isa = dynamic_cast<const ArmISA::ISA *>(isa);
-        assert(arm_isa);
-        return arm_isa->vecRegRenameMode();
-    }
-
-    static Enums::VecRegRenameMode
-    mode(const ArmISA::PCState& pc)
-    {
-        if (pc.aarch64()) {
-            return Enums::Full;
-        } else {
-            return Enums::Elem;
-        }
-    }
-
-    static bool
-    equalsInit(const BaseISA* isa1, const BaseISA* isa2)
-    {
-        return init(isa1) == init(isa2);
-    }
-};
+} // namespace ArmISA
+} // namespace gem5
 
 #endif

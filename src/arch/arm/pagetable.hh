@@ -43,9 +43,13 @@
 
 #include <cstdint>
 
-#include "arch/arm/isa_traits.hh"
+#include "arch/arm/page_size.hh"
+#include "arch/arm/types.hh"
 #include "arch/arm/utility.hh"
 #include "sim/serialize.hh"
+
+namespace gem5
+{
 
 namespace ArmISA
 {
@@ -69,7 +73,8 @@ struct PTE
 };
 
 // Lookup level
-enum LookupLevel {
+enum LookupLevel
+{
     L0 = 0,  // AArch64 only
     L1,
     L2,
@@ -81,13 +86,15 @@ enum LookupLevel {
 struct TlbEntry : public Serializable
 {
   public:
-    enum class MemoryType : std::uint8_t {
+    enum class MemoryType : std::uint8_t
+    {
         StronglyOrdered,
         Device,
         Normal
     };
 
-    enum class DomainType : std::uint8_t {
+    enum class DomainType : std::uint8_t
+    {
         NoAccess = 0,
         Client,
         Reserved,
@@ -106,7 +113,7 @@ struct TlbEntry : public Serializable
                                 // use (AArch32 w/ LPAE and AArch64)
 
     uint16_t asid;          // Address Space Identifier
-    uint8_t vmid;           // Virtual machine Identifier
+    vmid_t vmid;            // Virtual machine Identifier
     uint8_t N;              // Number of bits in pagesize
     uint8_t innerAttrs;
     uint8_t outerAttrs;
@@ -185,22 +192,22 @@ struct TlbEntry : public Serializable
     }
 
     bool
-    match(Addr va, uint8_t _vmid, bool hypLookUp, bool secure_lookup,
+    match(Addr va, vmid_t _vmid, bool hyp_lookup, bool secure_lookup,
           ExceptionLevel target_el, bool in_host) const
     {
-        return match(va, 0, _vmid, hypLookUp, secure_lookup, true,
+        return match(va, 0, _vmid, hyp_lookup, secure_lookup, true,
                      target_el, in_host);
     }
 
     bool
-    match(Addr va, uint16_t asn, uint8_t _vmid, bool hypLookUp,
+    match(Addr va, uint16_t asn, vmid_t _vmid, bool hyp_lookup,
           bool secure_lookup, bool ignore_asn, ExceptionLevel target_el,
           bool in_host) const
     {
         bool match = false;
         Addr v = vpn << N;
         if (valid && va >= v && va <= v + size && (secure_lookup == !nstid) &&
-            (hypLookUp == isHyp))
+            (hyp_lookup == isHyp))
         {
             match = checkELMatch(target_el, in_host);
 
@@ -359,8 +366,7 @@ struct TlbEntry : public Serializable
 
 };
 
+} // namespace ArmISA
+} // namespace gem5
 
-
-}
 #endif // __ARCH_ARM_PAGETABLE_H__
-

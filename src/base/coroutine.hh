@@ -41,9 +41,11 @@
 #include <functional>
 #include <stack>
 
+#include "base/compiler.hh"
 #include "base/fiber.hh"
 
-namespace m5
+GEM5_DEPRECATED_NAMESPACE(m5, gem5);
+namespace gem5
 {
 
 /**
@@ -66,11 +68,11 @@ class Coroutine : public Fiber
     // in case the channel should be void (Coroutine template parameters
     // are void. (See following ArgChannel, RetChannel typedef)
     struct Empty {};
-    using ArgChannel = typename std::conditional<
-        std::is_same<Arg, void>::value, Empty, std::stack<Arg>>::type;
+    using ArgChannel = typename std::conditional_t<
+        std::is_same<Arg, void>::value, Empty, std::stack<Arg>>;
 
-    using RetChannel = typename std::conditional<
-        std::is_same<Ret, void>::value, Empty, std::stack<Ret>>::type;
+    using RetChannel = typename std::conditional_t<
+        std::is_same<Ret, void>::value, Empty, std::stack<Ret>>;
 
   public:
     /**
@@ -292,6 +294,6 @@ class Coroutine : public Fiber
     CallerType caller;
 };
 
-} //namespace m5
+} //namespace gem5
 
 #endif // __BASE_COROUTINE_HH__

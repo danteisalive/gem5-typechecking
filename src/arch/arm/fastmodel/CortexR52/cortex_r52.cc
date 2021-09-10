@@ -30,10 +30,13 @@
 #include "arch/arm/fastmodel/iris/cpu.hh"
 #include "base/logging.hh"
 #include "dev/arm/base_gic.hh"
-#include "sim/core.hh"
 #include "systemc/tlm_bridge/gem5_to_tlm.hh"
 
-namespace FastModel
+namespace gem5
+{
+
+GEM5_DEPRECATED_NAMESPACE(FastModel, fastmodel);
+namespace fastmodel
 {
 
 void
@@ -152,4 +155,5 @@ CortexR52Cluster::getPort(const std::string &if_name, PortID idx)
     }
 }
 
-} // namespace FastModel
+} // namespace fastmodel
+} // namespace gem5

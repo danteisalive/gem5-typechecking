@@ -45,6 +45,9 @@
 
 #include "params/RiscvMMU.hh"
 
+namespace gem5
+{
+
 namespace RiscvISA {
 
 class MMU : public BaseMMU
@@ -57,7 +60,7 @@ class MMU : public BaseMMU
     {}
 
     PrivilegeMode
-    getMemPriv(ThreadContext *tc, BaseTLB::Mode mode)
+    getMemPriv(ThreadContext *tc, BaseMMU::Mode mode)
     {
         return static_cast<TLB*>(dtb)->getMemPriv(tc, mode);
     }
@@ -74,9 +77,17 @@ class MMU : public BaseMMU
       MMU *ommu = dynamic_cast<MMU*>(old_mmu);
       BaseMMU::takeOverFrom(ommu);
       pma->takeOverFrom(ommu->pma);
+
+    }
+
+    PMP *
+    getPMP()
+    {
+        return static_cast<TLB*>(dtb)->pmp;
     }
 };
 
 } // namespace RiscvISA
+} // namespace gem5
 
 #endif  // __ARCH_RISCV_MMU_HH__

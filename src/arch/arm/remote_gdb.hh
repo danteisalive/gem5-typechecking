@@ -46,10 +46,13 @@
 
 #include <algorithm>
 
-#include "arch/arm/registers.hh"
+#include "arch/arm/regs/vec.hh"
 #include "arch/arm/utility.hh"
 #include "base/compiler.hh"
 #include "base/remote_gdb.hh"
+
+namespace gem5
+{
 
 class System;
 class ThreadContext;
@@ -66,7 +69,8 @@ class RemoteGDB : public BaseRemoteGDB
     {
       using BaseGdbRegCache::BaseGdbRegCache;
       private:
-        struct M5_ATTR_PACKED {
+        struct GEM5_PACKED
+        {
           uint32_t gpr[16];
           uint32_t cpsr;
           uint64_t fpr[32];
@@ -88,7 +92,8 @@ class RemoteGDB : public BaseRemoteGDB
     {
       using BaseGdbRegCache::BaseGdbRegCache;
       private:
-        struct M5_ATTR_PACKED {
+        struct GEM5_PACKED
+        {
           uint64_t x[31];
           uint64_t spx;
           uint64_t pc;
@@ -113,7 +118,7 @@ class RemoteGDB : public BaseRemoteGDB
     AArch64GdbRegCache regCache64;
 
   public:
-    RemoteGDB(System *_system, ThreadContext *tc, int _port);
+    RemoteGDB(System *_system, int _port);
     BaseGdbRegCache *gdbRegs();
     std::vector<std::string>
     availableFeatures() const
@@ -122,6 +127,8 @@ class RemoteGDB : public BaseRemoteGDB
     };
     bool getXferFeaturesRead(const std::string &annex, std::string &output);
 };
+
 } // namespace ArmISA
+} // namespace gem5
 
 #endif /* __ARCH_ARM_REMOTE_GDB_H__ */

@@ -35,20 +35,55 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-from m5.objects.ArmTLB import ArmITB, ArmDTB
+from m5.objects.ArmTLB import ArmITB, ArmDTB, ArmStage2TLB
 from m5.objects.BaseMMU import BaseMMU
+from m5.objects.ClockedObject import ClockedObject
+from m5.params import *
+from m5.proxy import *
+
+# Basic stage 1 translation objects
+class ArmTableWalker(ClockedObject):
+    type = 'ArmTableWalker'
+    cxx_class = 'gem5::ArmISA::TableWalker'
+    cxx_header = "arch/arm/table_walker.hh"
+    is_stage2 =  Param.Bool(False, "Is this object for stage 2 translation?")
+    num_squash_per_cycle = Param.Unsigned(2,
+            "Number of outstanding walks that can be squashed per cycle")
+
+    port = RequestPort("Table Walker port")
+
+    sys = Param.System(Parent.any, "system object parameter")
+
+# Stage 2 translation objects, only used when virtualisation is being used
+class ArmStage2TableWalker(ArmTableWalker):
+    is_stage2 = True
 
 class ArmMMU(BaseMMU):
     type = 'ArmMMU'
-    cxx_class = 'ArmISA::MMU'
+    cxx_class = 'gem5::ArmISA::MMU'
     cxx_header = 'arch/arm/mmu.hh'
     itb = ArmITB()
     dtb = ArmDTB()
 
+    sys = Param.System(Parent.any, "system object parameter")
+
+    stage2_itb = Param.ArmTLB(ArmStage2TLB(), "Stage 2 Instruction TLB")
+    stage2_dtb = Param.ArmTLB(ArmStage2TLB(), "Stage 2 Data TLB")
+
+    itb_walker = Param.ArmTableWalker(
+        ArmTableWalker(), "HW Table walker")
+    dtb_walker = Param.ArmTableWalker(
+        ArmTableWalker(), "HW Table walker")
+
+    stage2_itb_walker = Param.ArmTableWalker(
+        ArmStage2TableWalker(), "HW Table walker")
+    stage2_dtb_walker = Param.ArmTableWalker(
+        ArmStage2TableWalker(), "HW Table walker")
+
     @classmethod
     def walkerPorts(cls):
-        return ["mmu.itb.walker.port", "mmu.dtb.walker.port"]
+        return ["mmu.itb_walker.port", "mmu.dtb_walker.port"]
 
     def connectWalkerPorts(self, iport, dport):
-        self.itb.walker.port = iport
-        self.dtb.walker.port = dport
+        self.itb_walker.port = iport
+        self.dtb_walker.port = dport

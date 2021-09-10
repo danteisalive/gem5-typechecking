@@ -31,12 +31,16 @@
 #include <cstdio>
 #include <string>
 
+#include "base/compiler.hh"
 #include "cpu/base.hh"
 #include "debug/SyscallVerbose.hh"
 #include "sim/mem_state.hh"
 #include "sim/process.hh"
 #include "sim/system.hh"
 #include "sim/vma.hh"
+
+namespace gem5
+{
 
 // The OS methods are called statically. Instantiate the random number
 // generator for access to /dev/urandom here.
@@ -73,7 +77,7 @@ Linux::openSpecialFile(std::string path, Process *process,
     if (matched) {
         FILE *f = tmpfile();
         int fd = fileno(f);
-        M5_VAR_USED size_t ret = fwrite(data.c_str(), 1, data.size(), f);
+        GEM5_VAR_USED size_t ret = fwrite(data.c_str(), 1, data.size(), f);
         assert(ret == data.size());
         rewind(f);
         return fd;
@@ -129,3 +133,5 @@ Linux::devRandom(Process *process, ThreadContext *tc)
     }
     return line.str();
 }
+
+} // namespace gem5

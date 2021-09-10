@@ -71,6 +71,9 @@
 // Hack
 #include "sim/stat_control.hh"
 
+namespace gem5
+{
+
 std::unique_ptr<BaseCPU::GlobalStats> BaseCPU::globalStats;
 
 std::vector<BaseCPU *> BaseCPU::cpuList;
@@ -125,7 +128,7 @@ BaseCPU::BaseCPU(const Params &p, bool is_checker)
     : ClockedObject(p), instCnt(0), _cpuId(p.cpu_id), _socketId(p.socket_id),
       _instRequestorId(p.system->getRequestorId(this, "inst")),
       _dataRequestorId(p.system->getRequestorId(this, "data")),
-      _taskId(ContextSwitchTaskId::Unknown), _pid(invldPid),
+      _taskId(context_switch_task_id::Unknown), _pid(invldPid),
       _switchedOut(p.switched_out), _cacheLineSize(p.system->cacheLineSize()),
       interrupts(p.interrupts), numThreads(p.numThreads), system(p.system),
       previousCycle(0), previousState(CPU_STATE_SLEEP),
@@ -255,7 +258,7 @@ BaseCPU::mwaitAtomic(ThreadID tid, ThreadContext *tc, BaseMMU *mmu)
     req->setVirt(addr, size, 0x0, dataRequestorId(), tc->instAddr());
 
     // translate to physical address
-    Fault fault = mmu->translateAtomic(req, tc, BaseTLB::Read);
+    Fault fault = mmu->translateAtomic(req, tc, BaseMMU::Read);
     assert(fault == NoFault);
 
     monitor.pAddr = req->getPaddr() & mask;
@@ -316,19 +319,19 @@ BaseCPU::startup()
     }
 
     if (_switchedOut)
-        powerState->set(Enums::PwrState::OFF);
+        powerState->set(enums::PwrState::OFF);
 
     // Assumption CPU start to operate instantaneously without any latency
-    if (powerState->get() == Enums::PwrState::UNDEFINED)
-        powerState->set(Enums::PwrState::ON);
+    if (powerState->get() == enums::PwrState::UNDEFINED)
+        powerState->set(enums::PwrState::ON);
 
 }
 
-ProbePoints::PMUUPtr
+probing::PMUUPtr
 BaseCPU::pmuProbePoint(const char *name)
 {
-    ProbePoints::PMUUPtr ptr;
-    ptr.reset(new ProbePoints::PMU(getProbeManager(), name));
+    probing::PMUUPtr ptr;
+    ptr.reset(new probing::PMU(getProbeManager(), name));
 
     return ptr;
 }
@@ -368,12 +371,13 @@ BaseCPU::probeInstCommit(const StaticInstPtr &inst, Addr pc)
 }
 
 BaseCPU::
-BaseCPUStats::BaseCPUStats(Stats::Group *parent)
-    : Stats::Group(parent),
-      ADD_STAT(numCycles, UNIT_CYCLE, "Number of cpu cycles simulated"),
-      ADD_STAT(numWorkItemsStarted, UNIT_COUNT,
+BaseCPUStats::BaseCPUStats(statistics::Group *parent)
+    : statistics::Group(parent),
+      ADD_STAT(numCycles, statistics::units::Cycle::get(),
+               "Number of cpu cycles simulated"),
+      ADD_STAT(numWorkItemsStarted, statistics::units::Count::get(),
                "Number of work items this cpu started"),
-      ADD_STAT(numWorkItemsCompleted, UNIT_COUNT,
+      ADD_STAT(numWorkItemsCompleted, statistics::units::Count::get(),
                "Number of work items this cpu completed")
 {
 }
@@ -389,7 +393,7 @@ BaseCPU::regStats()
         globalStats.reset(new GlobalStats(Root::root()));
     }
 
-    using namespace Stats;
+    using namespace statistics;
 
     int size = threadContexts.size();
     if (size > 1) {
@@ -433,9 +437,9 @@ BaseCPU::registerThreadContexts()
         ThreadContext *tc = threadContexts[tid];
 
         if (system->multiThread) {
-            tc->setContextId(system->registerThreadContext(tc));
+            system->registerThreadContext(tc);
         } else {
-            tc->setContextId(system->registerThreadContext(tc, _cpuId));
+            system->registerThreadContext(tc, _cpuId);
         }
 
         if (!FullSystem)
@@ -462,7 +466,7 @@ BaseCPU::schedulePowerGatingEvent()
             return;
     }
 
-    if (powerState->get() == Enums::PwrState::CLK_GATED &&
+    if (powerState->get() == enums::PwrState::CLK_GATED &&
         powerGatingOnIdle) {
         assert(!enterPwrGatingEvent.scheduled());
         // Schedule a power gating event when clock gated for the specified
@@ -491,7 +495,7 @@ BaseCPU::activateContext(ThreadID thread_num)
     if (enterPwrGatingEvent.scheduled())
         deschedule(enterPwrGatingEvent);
     // For any active thread running, update CPU power state to active (ON)
-    powerState->set(Enums::PwrState::ON);
+    powerState->set(enums::PwrState::ON);
 
     updateCycleCounters(CPU_STATE_WAKEUP);
 }
@@ -512,7 +516,7 @@ BaseCPU::suspendContext(ThreadID thread_num)
     updateCycleCounters(CPU_STATE_SLEEP);
 
     // All CPU threads suspended, enter lower power state for the CPU
-    powerState->set(Enums::PwrState::CLK_GATED);
+    powerState->set(enums::PwrState::CLK_GATED);
 
     // If pwrGatingLatency is set to 0 then this mechanism is disabled
     if (powerGatingOnIdle) {
@@ -531,7 +535,7 @@ BaseCPU::haltContext(ThreadID thread_num)
 void
 BaseCPU::enterPwrGating(void)
 {
-    powerState->set(Enums::PwrState::OFF);
+    powerState->set(enums::PwrState::OFF);
 }
 
 void
@@ -545,7 +549,7 @@ BaseCPU::switchOut()
     flushTLBs();
 
     // Go to the power gating state
-    powerState->set(Enums::PwrState::OFF);
+    powerState->set(enums::PwrState::OFF);
 }
 
 void
@@ -581,7 +585,7 @@ BaseCPU::takeOverFrom(BaseCPU *oldCPU)
         /* This code no longer works since the zero register (e.g.,
          * r31 on Alpha) doesn't necessarily contain zero at this
          * point.
-           if (DTRACE(Context))
+           if (debug::Context)
             ThreadContext::compare(oldTC, newTC);
         */
 
@@ -701,17 +705,17 @@ bool AddressMonitor::doMonitor(PacketPtr pkt) {
 void
 BaseCPU::traceFunctionsInternal(Addr pc)
 {
-    if (Loader::debugSymbolTable.empty())
+    if (loader::debugSymbolTable.empty())
         return;
 
     // if pc enters different function, print new function symbol and
     // update saved range.  Otherwise do nothing.
     if (pc < currentFunctionStart || pc >= currentFunctionEnd) {
-        auto it = Loader::debugSymbolTable.findNearest(
+        auto it = loader::debugSymbolTable.findNearest(
                 pc, currentFunctionEnd);
 
         std::string sym_str;
-        if (it == Loader::debugSymbolTable.end()) {
+        if (it == loader::debugSymbolTable.end()) {
             // no symbol found: use addr as label
             sym_str = csprintf("%#x", pc);
             currentFunctionStart = pc;
@@ -727,23 +731,18 @@ BaseCPU::traceFunctionsInternal(Addr pc)
     }
 }
 
-bool
-BaseCPU::waitForRemoteGDB() const
-{
-    return params().wait_for_remote_gdb;
-}
 
-
-BaseCPU::GlobalStats::GlobalStats(::Stats::Group *parent)
-    : ::Stats::Group(parent),
-    ADD_STAT(simInsts, UNIT_COUNT, "Number of instructions simulated"),
-    ADD_STAT(simOps, UNIT_COUNT,
+BaseCPU::GlobalStats::GlobalStats(statistics::Group *parent)
+    : statistics::Group(parent),
+    ADD_STAT(simInsts, statistics::units::Count::get(),
+             "Number of instructions simulated"),
+    ADD_STAT(simOps, statistics::units::Count::get(),
              "Number of ops (including micro ops) simulated"),
-    ADD_STAT(hostInstRate,
-             UNIT_RATE(Stats::Units::Count, Stats::Units::Second),
+    ADD_STAT(hostInstRate, statistics::units::Rate<
+                statistics::units::Count, statistics::units::Second>::get(),
              "Simulator instruction rate (inst/s)"),
-    ADD_STAT(hostOpRate,
-             UNIT_RATE(Stats::Units::Count, Stats::Units::Second),
+    ADD_STAT(hostOpRate, statistics::units::Rate<
+                statistics::units::Count, statistics::units::Second>::get(),
              "Simulator op (including micro ops) rate (op/s)")
 {
     simInsts
@@ -771,3 +770,5 @@ BaseCPU::GlobalStats::GlobalStats(::Stats::Group *parent)
     hostInstRate = simInsts / hostSeconds;
     hostOpRate = simOps / hostSeconds;
 }
+
+} // namespace gem5

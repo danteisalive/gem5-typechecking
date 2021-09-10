@@ -43,7 +43,6 @@
 #include <vector>
 
 #include "arch/arm/isa_device.hh"
-#include "arch/arm/registers.hh"
 #include "arch/arm/system.hh"
 #include "base/cprintf.hh"
 #include "cpu/base.hh"
@@ -51,6 +50,9 @@
 #include "sim/eventq.hh"
 #include "sim/sim_object.hh"
 #include "sim/system.hh"
+
+namespace gem5
+{
 
 struct ArmPMUParams;
 class Platform;
@@ -91,7 +93,8 @@ namespace ArmISA {
  * @see The ARM Architecture Refererence Manual (DDI 0487A)
  *
  */
-class PMU : public SimObject, public ArmISA::BaseISADevice {
+class PMU : public SimObject, public ArmISA::BaseISADevice
+{
   public:
     PMU(const ArmPMUParams &p);
     ~PMU();
@@ -115,14 +118,14 @@ class PMU : public SimObject, public ArmISA::BaseISADevice {
     /**
      * Set a register within the PMU.
      *
-     * @param misc_reg Register number (see miscregs.hh)
+     * @param misc_reg Register number (see regs/misc.hh)
      * @param val Value to store
      */
     void setMiscReg(int misc_reg, RegVal val) override;
     /**
      * Read a register within the PMU.
      *
-     * @param misc_reg Register number (see miscregs.hh)
+     * @param misc_reg Register number (see regs/misc.hh)
      * @return Register value.
      */
     RegVal readMiscReg(int misc_reg) override;
@@ -289,7 +292,8 @@ class PMU : public SimObject, public ArmISA::BaseISADevice {
     /**
      * Event definition base class
      */
-    struct PMUEvent {
+    struct PMUEvent
+    {
 
         PMUEvent() {}
 
@@ -340,7 +344,8 @@ class PMU : public SimObject, public ArmISA::BaseISADevice {
         std::set<PMU::CounterState*> userCounters;
     };
 
-    struct RegularEvent : public PMUEvent {
+    struct RegularEvent : public PMUEvent
+    {
         typedef std::pair<SimObject*, std::string> EventTypeEntry;
 
         void addMicroarchitectureProbe(SimObject* object,
@@ -406,7 +411,8 @@ class PMU : public SimObject, public ArmISA::BaseISADevice {
     PMUEvent* getEvent(uint64_t eventId);
 
     /** State of a counter within the PMU. **/
-    struct CounterState : public Serializable {
+    struct CounterState : public Serializable
+    {
         CounterState(PMU &pmuReference, uint64_t counter_id)
             : eventId(0), filter(0), enabled(false),
               overflow64(false), sourceEvent(nullptr),
@@ -625,4 +631,6 @@ class PMU : public SimObject, public ArmISA::BaseISADevice {
 };
 
 } // namespace ArmISA
+} // namespace gem5
+
 #endif

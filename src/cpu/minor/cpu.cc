@@ -37,7 +37,6 @@
 
 #include "cpu/minor/cpu.hh"
 
-#include "arch/utility.hh"
 #include "cpu/minor/dyn_inst.hh"
 #include "cpu/minor/fetch1.hh"
 #include "cpu/minor/pipeline.hh"
@@ -45,21 +44,24 @@
 #include "debug/MinorCPU.hh"
 #include "debug/Quiesce.hh"
 
+namespace gem5
+{
+
 MinorCPU::MinorCPU(const MinorCPUParams &params) :
     BaseCPU(params),
     threadPolicy(params.threadPolicy),
     stats(this)
 {
     /* This is only written for one thread at the moment */
-    Minor::MinorThread *thread;
+    minor::MinorThread *thread;
 
     for (ThreadID i = 0; i < numThreads; i++) {
         if (FullSystem) {
-            thread = new Minor::MinorThread(this, i, params.system,
+            thread = new minor::MinorThread(this, i, params.system,
                     params.mmu, params.isa[i]);
             thread->setStatus(ThreadContext::Halted);
         } else {
-            thread = new Minor::MinorThread(this, i, params.system,
+            thread = new minor::MinorThread(this, i, params.system,
                     params.workload[i], params.mmu,
                     params.isa[i]);
         }
@@ -74,9 +76,9 @@ MinorCPU::MinorCPU(const MinorCPUParams &params) :
         fatal("The Minor model doesn't support checking (yet)\n");
     }
 
-    Minor::MinorDynInst::init();
+    minor::MinorDynInst::init();
 
-    pipeline = new Minor::Pipeline(*this, params);
+    pipeline = new minor::Pipeline(*this, params);
     activityRecorder = pipeline->getActivityRecorder();
 
     fetchEventWrapper = NULL;
@@ -100,7 +102,7 @@ MinorCPU::init()
     BaseCPU::init();
 
     if (!params().switched_out &&
-        system->getMemoryMode() != Enums::timing)
+        system->getMemoryMode() != enums::timing)
     {
         fatal("The Minor CPU requires the memory system to be in "
             "'timing' mode.\n");
@@ -270,7 +272,7 @@ MinorCPU::activateContext(ThreadID thread_id)
 
     /* Wake up the thread, wakeup the pipeline tick */
     threads[thread_id]->activate();
-    wakeupOnEvent(Minor::Pipeline::CPUStageId);
+    wakeupOnEvent(minor::Pipeline::CPUStageId);
 
     if (!threads[thread_id]->getUseForClone())//the thread is not cloned
     {
@@ -345,3 +347,5 @@ MinorCPU::totalOps() const
 
     return ret;
 }
+
+} // namespace gem5

@@ -49,13 +49,15 @@
 #include <stack>
 #include <unordered_map>
 
-#include "arch/riscv/registers.hh"
 #include "base/logging.hh"
 #include "base/trace.hh"
 #include "cpu/base.hh"
 #include "debug/LLSC.hh"
 #include "mem/packet.hh"
 #include "mem/request.hh"
+
+namespace gem5
+{
 
 /*
  * ISA-specific helper functions for locked memory accesses.
@@ -140,5 +142,6 @@ globalClearExclusive(XC *xc)
 }
 
 } // namespace RiscvISA
+} // namespace gem5
 
 #endif // __ARCH_RISCV_LOCKED_MEM_HH__

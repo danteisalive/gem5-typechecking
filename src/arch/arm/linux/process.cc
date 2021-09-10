@@ -43,8 +43,8 @@
 
 #include <sys/syscall.h>
 
-#include "arch/arm/isa_traits.hh"
 #include "arch/arm/linux/linux.hh"
+#include "arch/arm/page_size.hh"
 #include "base/loader/object_file.hh"
 #include "base/trace.hh"
 #include "cpu/thread_context.hh"
@@ -53,6 +53,9 @@
 #include "sim/syscall_desc.hh"
 #include "sim/syscall_emul.hh"
 #include "sim/system.hh"
+
+namespace gem5
+{
 
 using namespace ArmISA;
 
@@ -111,3 +114,5 @@ ArmLinuxProcess64::initState()
     ArmProcess64::initState();
     // The 64 bit equivalent of the comm page would be set up here.
 }
+
+} // namespace gem5

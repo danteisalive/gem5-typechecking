@@ -47,6 +47,7 @@
 
 #include <vector>
 
+#include "base/named.hh"
 #include "base/types.hh"
 #include "cpu/minor/buffers.hh"
 #include "cpu/minor/cpu.hh"
@@ -55,7 +56,11 @@
 #include "cpu/minor/pipe_data.hh"
 #include "cpu/minor/scoreboard.hh"
 
-namespace Minor
+namespace gem5
+{
+
+GEM5_DEPRECATED_NAMESPACE(Minor, minor);
+namespace minor
 {
 
 /** Execute stage.  Everything apart from fetching and decoding instructions.
@@ -63,6 +68,7 @@ namespace Minor
 class Execute : public Named
 {
   protected:
+
     /** Input port carrying instructions from Decode */
     Latch<ForwardInstData>::Output inp;
 
@@ -71,6 +77,9 @@ class Execute : public Named
 
     /** Pointer back to the containing CPU */
     MinorCPU &cpu;
+
+    /** Index of the zero integer register. */
+    const RegIndex zeroReg;
 
     /** Number of instructions that can be issued per cycle */
     unsigned int issueLimit;
@@ -144,7 +153,8 @@ class Execute : public Named
         DrainAllInsts /* Discarding all remaining insts */
     };
 
-    struct ExecuteThreadInfo {
+    struct ExecuteThreadInfo
+    {
         /** Constructor */
         ExecuteThreadInfo(unsigned int insts_committed) :
             inputIndex(0),
@@ -353,6 +363,7 @@ class Execute : public Named
     void drainResume();
 };
 
-}
+} // namespace minor
+} // namespace gem5
 
 #endif /* __CPU_MINOR_EXECUTE_HH__ */

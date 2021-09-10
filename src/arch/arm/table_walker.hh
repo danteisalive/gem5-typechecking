@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010-2016, 2019 ARM Limited
+ * Copyright (c) 2010-2016, 2019, 2021 Arm Limited
  * All rights reserved
  *
  * The license below extends only to copyright in the software and shall
@@ -41,29 +41,35 @@
 #include <list>
 
 #include "arch/arm/faults.hh"
-#include "arch/arm/miscregs.hh"
+#include "arch/arm/regs/misc.hh"
 #include "arch/arm/system.hh"
 #include "arch/arm/tlb.hh"
+#include "arch/arm/types.hh"
+#include "arch/generic/mmu.hh"
+#include "mem/packet_queue.hh"
+#include "mem/qport.hh"
 #include "mem/request.hh"
 #include "params/ArmTableWalker.hh"
 #include "sim/clocked_object.hh"
 #include "sim/eventq.hh"
 
-class ThreadContext;
+namespace gem5
+{
 
-class DmaPort;
+class ThreadContext;
 
 namespace ArmISA {
 class Translation;
 class TLB;
-class Stage2MMU;
+class MMU;
 
 class TableWalker : public ClockedObject
 {
   public:
     class WalkerState;
 
-    class DescriptorBase {
+    class DescriptorBase
+    {
       public:
         DescriptorBase() : lookupLevel(L0) {}
 
@@ -89,10 +95,12 @@ class TableWalker : public ClockedObject
         }
     };
 
-    class L1Descriptor : public DescriptorBase {
+    class L1Descriptor : public DescriptorBase
+    {
       public:
         /** Type of page table entry ARM DDI 0406B: B3-8*/
-        enum EntryType {
+        enum EntryType
+        {
             Ignore,
             PageTable,
             Section,
@@ -240,7 +248,8 @@ class TableWalker : public ClockedObject
     };
 
     /** Level 2 page table descriptor */
-    class L2Descriptor : public DescriptorBase {
+    class L2Descriptor : public DescriptorBase
+    {
       public:
         /** The raw bits of the entry. */
         uint32_t     data;
@@ -364,7 +373,8 @@ class TableWalker : public ClockedObject
     };
 
     // Granule sizes for AArch64 long descriptors
-    enum GrainSize {
+    enum GrainSize
+    {
         Grain4KB  = 12,
         Grain16KB = 14,
         Grain64KB = 16,
@@ -372,10 +382,12 @@ class TableWalker : public ClockedObject
     };
 
     /** Long-descriptor format (LPAE) */
-    class LongDescriptor : public DescriptorBase {
+    class LongDescriptor : public DescriptorBase
+    {
       public:
         /** Descriptor type */
-        enum EntryType {
+        enum EntryType
+        {
             Invalid,
             Table,
             Block,
@@ -737,11 +749,11 @@ class TableWalker : public ClockedObject
 
         /** ASID that we're servicing the request under */
         uint16_t asid;
-        uint8_t vmid;
+        vmid_t vmid;
         bool    isHyp;
 
         /** Translation state for delayed requests */
-        TLB::Translation *transState;
+        BaseMMU::Translation *transState;
 
         /** The fault that we are going to return */
         Fault fault;
@@ -762,7 +774,8 @@ class TableWalker : public ClockedObject
         CPSR cpsr;
 
         /** Cached copy of ttbcr/tcr as it existed when translation began */
-        union {
+        union
+        {
             TTBCR ttbcr; // AArch32 translations
             TCR tcr;     // AArch64 translations
         };
@@ -803,7 +816,7 @@ class TableWalker : public ClockedObject
         bool stage2Req;
 
         /** A pointer to the stage 2 translation that's in progress */
-        TLB::Translation *stage2Tran;
+        BaseMMU::Translation *stage2Tran;
 
         /** If the mode is timing or atomic */
         bool timing;
@@ -812,7 +825,7 @@ class TableWalker : public ClockedObject
         bool functional;
 
         /** Save mode for use in delayed response */
-        BaseTLB::Mode mode;
+        BaseMMU::Mode mode;
 
         /** The translation type that has been requested */
         TLB::ArmTranslationType tranType;
@@ -846,6 +859,89 @@ class TableWalker : public ClockedObject
         std::string name() const { return tableWalker->name(); }
     };
 
+    class TableWalkerState : public Packet::SenderState
+    {
+      public:
+        Tick delay = 0;
+        Event *event = nullptr;
+    };
+
+    class Port : public QueuedRequestPort
+    {
+      public:
+        Port(TableWalker* _walker, RequestorID id);
+
+        void sendFunctionalReq(Addr desc_addr, int size,
+            uint8_t *data, Request::Flags flag);
+        void sendAtomicReq(Addr desc_addr, int size,
+            uint8_t *data, Request::Flags flag, Tick delay);
+        void sendTimingReq(Addr desc_addr, int size,
+            uint8_t *data, Request::Flags flag, Tick delay,
+            Event *event);
+
+        bool recvTimingResp(PacketPtr pkt) override;
+
+      private:
+        void handleRespPacket(PacketPtr pkt, Tick delay=0);
+        void handleResp(TableWalkerState *state, Addr addr,
+                        Addr size, Tick delay=0);
+
+        PacketPtr createPacket(Addr desc_addr, int size,
+                               uint8_t *data, Request::Flags flag,
+                               Tick delay, Event *event);
+
+      private:
+        /** Packet queue used to store outgoing requests. */
+        ReqPacketQueue reqQueue;
+
+        /** Packet queue used to store outgoing snoop responses. */
+        SnoopRespPacketQueue snoopRespQueue;
+
+        /** Cached requestorId of the table walker */
+        RequestorID requestorId;
+    };
+
+    /** This translation class is used to trigger the data fetch once a timing
+        translation returns the translated physical address */
+    class Stage2Walk : public BaseMMU::Translation
+    {
+      private:
+        uint8_t      *data;
+        int          numBytes;
+        RequestPtr   req;
+        Event        *event;
+        TableWalker  &parent;
+        Addr         oVAddr;
+
+      public:
+        Fault fault;
+
+        Stage2Walk(TableWalker &_parent, uint8_t *_data, Event *_event,
+                   Addr vaddr);
+
+        void markDelayed() {}
+
+        void finish(const Fault &fault, const RequestPtr &req,
+            ThreadContext *tc, BaseMMU::Mode mode);
+
+        void
+        setVirt(Addr vaddr, int size, Request::Flags flags,
+                int requestorId)
+        {
+            numBytes = size;
+            req->setVirt(vaddr, size, flags, requestorId, 0);
+        }
+
+        void translateTiming(ThreadContext *tc);
+    };
+
+    Fault readDataUntimed(ThreadContext *tc, Addr vaddr, Addr desc_addr,
+                          uint8_t *data, int num_bytes, Request::Flags flags,
+                          bool functional);
+    void readDataTimed(ThreadContext *tc, Addr desc_addr,
+                       Stage2Walk *translation, int num_bytes,
+                       Request::Flags flags);
+
   protected:
 
     /** Queues of requests for all the different lookup levels */
@@ -856,13 +952,13 @@ class TableWalker : public ClockedObject
     std::list<WalkerState *> pendingQueue;
 
     /** The MMU to forward second stage look upts to */
-    Stage2MMU *stage2Mmu;
-
-    /** Port shared by the two table walkers. */
-    DmaPort* port;
+    MMU *mmu;
 
     /** Requestor id assigned by the MMU. */
     RequestorID requestorId;
+
+    /** Port shared by the two table walkers. */
+    Port* port;
 
     /** Indicates whether this table walker is part of the stage 2 mmu */
     const bool isStage2;
@@ -890,20 +986,22 @@ class TableWalker : public ClockedObject
     bool _haveLargeAsid64;
 
     /** Statistics */
-   struct TableWalkerStats : public Stats::Group {
-        TableWalkerStats(Stats::Group *parent);
-        Stats::Scalar walks;
-        Stats::Scalar walksShortDescriptor;
-        Stats::Scalar walksLongDescriptor;
-        Stats::Vector walksShortTerminatedAtLevel;
-        Stats::Vector walksLongTerminatedAtLevel;
-        Stats::Scalar squashedBefore;
-        Stats::Scalar squashedAfter;
-        Stats::Histogram walkWaitTime;
-        Stats::Histogram walkServiceTime;
-        Stats::Histogram pendingWalks; // essentially "L" of queueing theory
-        Stats::Vector pageSizes;
-        Stats::Vector2d requestOrigin;
+    struct TableWalkerStats : public statistics::Group
+    {
+        TableWalkerStats(statistics::Group *parent);
+        statistics::Scalar walks;
+        statistics::Scalar walksShortDescriptor;
+        statistics::Scalar walksLongDescriptor;
+        statistics::Vector walksShortTerminatedAtLevel;
+        statistics::Vector walksLongTerminatedAtLevel;
+        statistics::Scalar squashedBefore;
+        statistics::Scalar squashedAfter;
+        statistics::Histogram walkWaitTime;
+        statistics::Histogram walkServiceTime;
+        // Essentially "L" of queueing theory
+        statistics::Histogram pendingWalks;
+        statistics::Vector pageSizes;
+        statistics::Vector2d requestOrigin;
     } stats;
 
     mutable unsigned pendingReqs;
@@ -917,8 +1015,6 @@ class TableWalker : public ClockedObject
     TableWalker(const Params &p);
     virtual ~TableWalker();
 
-    void init() override;
-
     bool haveLPAE() const { return _haveLPAE; }
     bool haveVirtualization() const { return _haveVirtualization; }
     bool haveLargeAsid64() const { return _haveLargeAsid64; }
@@ -928,18 +1024,21 @@ class TableWalker : public ClockedObject
     DrainState drain() override;
     void drainResume() override;
 
-    Port &getPort(const std::string &if_name,
-                  PortID idx=InvalidPortID) override;
+    gem5::Port &getPort(const std::string &if_name,
+                    PortID idx=InvalidPortID) override;
+
+    Port &getTableWalkerPort();
 
     Fault walk(const RequestPtr &req, ThreadContext *tc,
-               uint16_t asid, uint8_t _vmid,
-               bool _isHyp, TLB::Mode mode, TLB::Translation *_trans,
+               uint16_t asid, vmid_t _vmid,
+               bool _isHyp, BaseMMU::Mode mode, BaseMMU::Translation *_trans,
                bool timing, bool functional, bool secure,
                TLB::ArmTranslationType tranType, bool _stage2Req);
 
+    void setMmu(MMU *_mmu) { mmu = _mmu; }
     void setTlb(TLB *_tlb) { tlb = _tlb; }
+    void setPort(Port *_port) { port = _port; }
     TLB* getTlb() { return tlb; }
-    void setMMU(Stage2MMU *m, RequestorID requestor_id);
     void memAttrs(ThreadContext *tc, TlbEntry &te, SCTLR sctlr,
                   uint8_t texcb, bool s);
     void memAttrsLPAE(ThreadContext *tc, TlbEntry &te,
@@ -1006,6 +1105,6 @@ class TableWalker : public ClockedObject
 };
 
 } // namespace ArmISA
+} // namespace gem5
 
 #endif //__ARCH_ARM_TABLE_WALKER_HH__
-

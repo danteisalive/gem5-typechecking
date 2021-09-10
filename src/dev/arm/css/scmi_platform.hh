@@ -41,12 +41,15 @@
 #include "dev/arm/css/scmi_protocols.hh"
 #include "dev/arm/css/scp.hh"
 #include "dev/dma_device.hh"
-#include "mem/mem_object.hh"
 #include "params/ScmiPlatform.hh"
+
+namespace gem5
+{
 
 class Doorbell;
 
-namespace SCMI
+GEM5_DEPRECATED_NAMESPACE(SCMI, scmi);
+namespace scmi
 {
 
 class Platform;
@@ -326,6 +329,7 @@ class Platform : public Scp
     DmaPort dmaPort;
 };
 
-} // namespace SCMI
+} // namespace scmi
+} // namespace gem5
 
 #endif // __DEV_ARM_CSS_SCMI_PLATFORM_H__

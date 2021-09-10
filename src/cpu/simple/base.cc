@@ -41,7 +41,6 @@
 
 #include "cpu/simple/base.hh"
 
-#include "arch/utility.hh"
 #include "base/cprintf.hh"
 #include "base/inifile.hh"
 #include "base/loader/symtab.hh"
@@ -54,6 +53,7 @@
 #include "cpu/checker/cpu.hh"
 #include "cpu/checker/thread_context.hh"
 #include "cpu/exetrace.hh"
+#include "cpu/null_static_inst.hh"
 #include "cpu/pred/bpred_unit.hh"
 #include "cpu/simple/exec_context.hh"
 #include "cpu/simple_thread.hh"
@@ -77,12 +77,15 @@
 #include "sim/stats.hh"
 #include "sim/system.hh"
 
+namespace gem5
+{
+
 BaseSimpleCPU::BaseSimpleCPU(const BaseSimpleCPUParams &p)
     : BaseCPU(p),
       curThread(0),
       branchPred(p.branchPred),
+      zeroReg(p.isa[0]->regClasses().at(IntRegClass).zeroReg()),
       traceData(NULL),
-      inst(),
       _status(Idle)
 {
     SimpleThread *thread;
@@ -162,8 +165,6 @@ BaseSimpleCPU::countInst()
     if (!curStaticInst->isMicroop() || curStaticInst->isLastMicroop()) {
         t_info.numInst++;
         t_info.execContextStats.numInsts++;
-
-        t_info.thread->funcExeInst++;
     }
     t_info.numOp++;
     t_info.execContextStats.numOps++;
@@ -245,7 +246,7 @@ BaseSimpleCPU::wakeup(ThreadID tid)
 void
 BaseSimpleCPU::traceFault()
 {
-    if (DTRACE(ExecFaulting)) {
+    if (debug::ExecFaulting) {
         traceData->setFaulting(true);
     } else {
         delete traceData;
@@ -290,16 +291,23 @@ BaseSimpleCPU::setupFetchRequest(const RequestPtr &req)
     SimpleExecContext &t_info = *threadInfo[curThread];
     SimpleThread* thread = t_info.thread;
 
+    auto &decoder = thread->decoder;
     Addr instAddr = thread->instAddr();
-    Addr fetchPC = (instAddr & PCMask) + t_info.fetchOffset;
+    Addr fetchPC = (instAddr & decoder.pcMask()) + t_info.fetchOffset;
 
     // set up memory request for instruction fetch
     DPRINTF(Fetch, "Fetch: Inst PC:%08p, Fetch PC:%08p\n", instAddr, fetchPC);
 
-    req->setVirt(fetchPC, sizeof(TheISA::MachInst), Request::INST_FETCH,
+    req->setVirt(fetchPC, decoder.moreBytesSize(), Request::INST_FETCH,
                  instRequestorId(), instAddr);
 }
 
+void
+BaseSimpleCPU::serviceInstCountEvents()
+{
+    SimpleExecContext &t_info = *threadInfo[curThread];
+    t_info.thread->comInstEventQueue.serviceEvents(t_info.numInst);
+}
 
 void
 BaseSimpleCPU::preExecute()
@@ -308,45 +316,41 @@ BaseSimpleCPU::preExecute()
     SimpleThread* thread = t_info.thread;
 
     // maintain $r0 semantics
-    thread->setIntReg(TheISA::ZeroReg, 0);
+    thread->setIntReg(zeroReg, 0);
 
     // resets predicates
     t_info.setPredicate(true);
     t_info.setMemAccPredicate(true);
 
-    // check for instruction-count-based events
-    thread->comInstEventQueue.serviceEvents(t_info.numInst);
-
     // decode the instruction
     TheISA::PCState pcState = thread->pcState();
 
+    auto &decoder = thread->decoder;
+
     if (isRomMicroPC(pcState.microPC())) {
         t_info.stayAtPC = false;
-        curStaticInst = thread->decoder.fetchRomMicroop(
+        curStaticInst = decoder.fetchRomMicroop(
                 pcState.microPC(), curMacroStaticInst);
     } else if (!curMacroStaticInst) {
         //We're not in the middle of a macro instruction
         StaticInstPtr instPtr = NULL;
 
-        TheISA::Decoder *decoder = &(thread->decoder);
-
         //Predecode, ie bundle up an ExtMachInst
         //If more fetch data is needed, pass it in.
-        Addr fetchPC = (pcState.instAddr() & PCMask) + t_info.fetchOffset;
-        //if (decoder->needMoreBytes())
-            decoder->moreBytes(pcState, fetchPC, inst);
-        //else
-        //    decoder->process();
+        Addr fetchPC =
+            (pcState.instAddr() & decoder.pcMask()) + t_info.fetchOffset;
+
+        decoder.moreBytes(pcState, fetchPC);
 
         //Decode an instruction if one is ready. Otherwise, we'll have to
         //fetch beyond the MachInst at the current pc.
-        instPtr = decoder->decode(pcState);
+        instPtr = decoder.decode(pcState);
         if (instPtr) {
             t_info.stayAtPC = false;
             thread->pcState(pcState);
         } else {
             t_info.stayAtPC = true;
-            t_info.fetchOffset += sizeof(TheISA::MachInst);
+            t_info.fetchOffset += decoder.moreBytesSize();
         }
 
         //If we decoded an instruction and it's microcoded, start pulling
@@ -473,15 +477,15 @@ BaseSimpleCPU::advancePC(const Fault &fault)
     //Since we're moving to a new pc, zero out the offset
     t_info.fetchOffset = 0;
     if (fault != NoFault) {
-        curMacroStaticInst = StaticInst::nullStaticInstPtr;
+        curMacroStaticInst = nullStaticInstPtr;
         fault->invoke(threadContexts[curThread], curStaticInst);
         thread->decoder.reset();
     } else {
         if (curStaticInst) {
             if (curStaticInst->isLastMicroop())
-                curMacroStaticInst = StaticInst::nullStaticInstPtr;
+                curMacroStaticInst = nullStaticInstPtr;
             TheISA::PCState pcState = thread->pcState();
-            TheISA::advancePC(pcState, curStaticInst);
+            curStaticInst->advancePC(pcState);
             thread->pcState(pcState);
         }
     }
@@ -501,3 +505,5 @@ BaseSimpleCPU::advancePC(const Fault &fault)
         }
     }
 }
+
+} // namespace gem5

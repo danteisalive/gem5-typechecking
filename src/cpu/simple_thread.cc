@@ -42,7 +42,6 @@
 
 #include <string>
 
-#include "arch/utility.hh"
 #include "base/callback.hh"
 #include "base/compiler.hh"
 #include "base/cprintf.hh"
@@ -62,6 +61,9 @@
 #include "sim/sim_exit.hh"
 #include "sim/system.hh"
 
+namespace gem5
+{
+
 // constructor
 SimpleThread::SimpleThread(BaseCPU *_cpu, int _thread_num, System *_sys,
                            Process *_process, BaseMMU *_mmu,
@@ -74,32 +76,28 @@ SimpleThread::SimpleThread(BaseCPU *_cpu, int _thread_num, System *_sys,
       htmTransactionStarts(0), htmTransactionStops(0)
 {
     assert(isa);
+    const auto &regClasses = isa->regClasses();
+    intRegs.resize(regClasses.at(IntRegClass).size());
+    floatRegs.resize(regClasses.at(FloatRegClass).size());
+    vecRegs.resize(regClasses.at(VecRegClass).size());
+    vecPredRegs.resize(regClasses.at(VecPredRegClass).size());
+    ccRegs.resize(regClasses.at(CCRegClass).size());
     clearArchRegs();
 }
 
 SimpleThread::SimpleThread(BaseCPU *_cpu, int _thread_num, System *_sys,
                            BaseMMU *_mmu, BaseISA *_isa)
-    : ThreadState(_cpu, _thread_num, NULL),
-      isa(dynamic_cast<TheISA::ISA *>(_isa)),
-      predicate(true), memAccPredicate(true),
-      comInstEventQueue("instruction-based event queue"),
-      system(_sys), mmu(_mmu), decoder(isa),
-      htmTransactionStarts(0), htmTransactionStops(0)
-{
-    assert(isa);
-
-    clearArchRegs();
-}
+    : SimpleThread(_cpu, _thread_num, _sys, nullptr, _mmu, _isa)
+{}
 
 void
 SimpleThread::takeOverFrom(ThreadContext *oldContext)
 {
-    ::takeOverFrom(*this, *oldContext);
+    gem5::takeOverFrom(*this, *oldContext);
     decoder.takeOverFrom(oldContext->getDecoderPtr());
 
     isa->takeOverFrom(this, oldContext);
 
-    funcExeInst = oldContext->readFuncExeInst();
     storeCondFailures = 0;
 }
 
@@ -109,8 +107,6 @@ SimpleThread::copyState(ThreadContext *oldContext)
     // copy over functional state
     _status = oldContext->status();
     copyArchRegs(oldContext);
-    if (FullSystem)
-        funcExeInst = oldContext->readFuncExeInst();
 
     _threadId = oldContext->threadId();
     _contextId = oldContext->contextId();
@@ -120,7 +116,7 @@ void
 SimpleThread::serialize(CheckpointOut &cp) const
 {
     ThreadState::serialize(cp);
-    ::serialize(*this, cp);
+    gem5::serialize(*this, cp);
 }
 
 
@@ -128,7 +124,7 @@ void
 SimpleThread::unserialize(CheckpointIn &cp)
 {
     ThreadState::unserialize(cp);
-    ::unserialize(*this, cp);
+    gem5::unserialize(*this, cp);
 }
 
 void
@@ -168,7 +164,7 @@ SimpleThread::halt()
 void
 SimpleThread::copyArchRegs(ThreadContext *src_tc)
 {
-    TheISA::copyRegs(src_tc, this);
+    getIsaPtr()->copyRegsFrom(src_tc);
 }
 
 // hardware transactional memory
@@ -196,3 +192,5 @@ SimpleThread::setHtmCheckpointPtr(BaseHTMCheckpointPtr new_cpt)
 {
     _htmCheckpoint = std::move(new_cpt);
 }
+
+} // namespace gem5

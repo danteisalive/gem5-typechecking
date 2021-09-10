@@ -50,9 +50,6 @@ Source('emulenv.cc')
 Source('faults.cc')
 Source('fs_workload.cc')
 Source('insts/badmicroop.cc')
-Source('insts/microfpop.cc')
-Source('insts/microldstop.cc')
-Source('insts/micromediaop.cc')
 Source('insts/microop.cc')
 Source('insts/microregop.cc')
 Source('insts/static_inst.cc')
@@ -77,10 +74,9 @@ SimObject('X86TLB.py')
 
 DebugFlag('Faults', "Trace all faults/exceptions/traps")
 DebugFlag('LocalApic', "Local APIC debugging")
-DebugFlag('PageTableWalker', \
-          "Page table walker state machine debugging")
 DebugFlag('Decoder', "Decoder debug output")
 DebugFlag('X86', "Generic X86 ISA debugging")
+DebugFlag('ACPI', "ACPI debugging")
 
 python_files = (
     '__init__.py',

@@ -30,7 +30,11 @@
 
 #include "arch/arm/fastmodel/iris/thread_context.hh"
 
-namespace FastModel
+namespace gem5
+{
+
+GEM5_DEPRECATED_NAMESPACE(FastModel, fastmodel);
+namespace fastmodel
 {
 
 // This ThreadContext class translates accesses to state using gem5's native
@@ -43,8 +47,8 @@ class CortexR52TC : public Iris::ThreadContext
     static std::vector<iris::MemorySpaceId> bpSpaceIds;
 
   public:
-    CortexR52TC(::BaseCPU *cpu, int id, System *system,
-                ::BaseMMU *mmu, ::BaseISA *isa,
+    CortexR52TC(gem5::BaseCPU *cpu, int id, System *system,
+                gem5::BaseMMU *mmu, gem5::BaseISA *isa,
                 iris::IrisConnectionInterface *iris_if,
                 const std::string &iris_path);
 
@@ -104,6 +108,7 @@ class CortexR52TC : public Iris::ThreadContext
     }
 };
 
-} // namespace FastModel
+} // namespace fastmodel
+} // namespace gem5
 
 #endif // __ARCH_ARM_FASTMODEL_CORTEXR52_THREAD_CONTEXT_HH__

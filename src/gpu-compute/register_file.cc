@@ -45,6 +45,9 @@
 #include "gpu-compute/wavefront.hh"
 #include "params/RegisterFile.hh"
 
+namespace gem5
+{
+
 RegisterFile::RegisterFile(const RegisterFileParams &p)
     : SimObject(p), simdId(p.simd_id), _numRegs(p.num_regs), stats(this)
 {
@@ -189,8 +192,8 @@ RegisterFile::dispatchInstruction(GPUDynInstPtr ii)
 {
 }
 
-RegisterFile::RegisterFileStats::RegisterFileStats(Stats::Group *parent)
-    : Stats::Group(parent),
+RegisterFile::RegisterFileStats::RegisterFileStats(statistics::Group *parent)
+    : statistics::Group(parent),
       ADD_STAT(registerReads,
               "Total number of DWORDs read from register file"),
       ADD_STAT(registerWrites,
@@ -201,3 +204,5 @@ RegisterFile::RegisterFileStats::RegisterFileStats(Stats::Group *parent)
               "Total number of register file bank SRAM activations for writes")
 {
 }
+
+} // namespace gem5

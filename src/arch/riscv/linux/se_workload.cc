@@ -38,6 +38,9 @@
 #include "cpu/thread_context.hh"
 #include "sim/syscall_emul.hh"
 
+namespace gem5
+{
+
 namespace
 {
 
@@ -45,30 +48,30 @@ class LinuxLoader : public Process::Loader
 {
   public:
     Process *
-    load(const ProcessParams &params, ::Loader::ObjectFile *obj) override
+    load(const ProcessParams &params, loader::ObjectFile *obj) override
     {
         auto arch = obj->getArch();
         auto opsys = obj->getOpSys();
 
-        if (arch != ::Loader::Riscv64 && arch != ::Loader::Riscv32)
+        if (arch != loader::Riscv64 && arch != loader::Riscv32)
             return nullptr;
 
-        if (opsys == ::Loader::UnknownOpSys) {
+        if (opsys == loader::UnknownOpSys) {
             warn("Unknown operating system; assuming Linux.");
-            opsys = ::Loader::Linux;
+            opsys = loader::Linux;
         }
 
-        if (opsys != ::Loader::Linux)
+        if (opsys != loader::Linux)
             return nullptr;
 
-        if (arch == ::Loader::Riscv64)
+        if (arch == loader::Riscv64)
             return new RiscvProcess64(params, obj);
         else
             return new RiscvProcess32(params, obj);
     }
 };
 
-LinuxLoader loader;
+LinuxLoader linuxLoader;
 
 } // anonymous namespace
 
@@ -783,3 +786,4 @@ SyscallDescTable<SEWorkload::SyscallABI> EmuLinux::syscallDescs32 = {
 };
 
 } // namespace RiscvISA
+} // namespace gem5

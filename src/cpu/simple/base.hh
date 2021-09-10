@@ -43,7 +43,6 @@
 #define __CPU_SIMPLE_BASE_HH__
 
 #include "base/statistics.hh"
-#include "config/the_isa.hh"
 #include "cpu/base.hh"
 #include "cpu/checker/cpu.hh"
 #include "cpu/exec_context.hh"
@@ -57,31 +56,34 @@
 #include "sim/full_system.hh"
 #include "sim/system.hh"
 
+namespace gem5
+{
+
 // forward declarations
 class Checkpoint;
 class Process;
 class Processor;
 class ThreadContext;
 
-namespace TheISA
+namespace Trace
 {
-    class DTB;
-    class ITB;
-}
-
-namespace Trace {
     class InstRecord;
 }
 
 struct BaseSimpleCPUParams;
-class BPredUnit;
+namespace branch_prediction
+{
+    class BPredUnit;
+} // namespace branch_prediction
 class SimpleExecContext;
 
 class BaseSimpleCPU : public BaseCPU
 {
   protected:
     ThreadID curThread;
-    BPredUnit *branchPred;
+    branch_prediction::BPredUnit *branchPred;
+
+    const RegIndex zeroReg;
 
     void checkPcEventQueue();
     void swapActiveThread();
@@ -99,12 +101,12 @@ class BaseSimpleCPU : public BaseCPU
     std::list<ThreadID> activeThreads;
 
     /** Current instruction */
-    TheISA::MachInst inst;
     StaticInstPtr curStaticInst;
     StaticInstPtr curMacroStaticInst;
 
   protected:
-    enum Status {
+    enum Status
+    {
         Idle,
         Running,
         Faulting,
@@ -131,6 +133,7 @@ class BaseSimpleCPU : public BaseCPU
   public:
     void checkForInterrupts();
     void setupFetchRequest(const RequestPtr &req);
+    void serviceInstCountEvents();
     void preExecute();
     void postExecute();
     void advancePC(const Fault &fault);
@@ -140,33 +143,41 @@ class BaseSimpleCPU : public BaseCPU
     // statistics
     void resetStats() override;
 
-    virtual Fault readMem(Addr addr, uint8_t* data, unsigned size,
-                          Request::Flags flags,
-                          const std::vector<bool>& byte_enable =
-                              std::vector<bool>())
-    { panic("readMem() is not implemented\n"); }
+    virtual Fault
+    readMem(Addr addr, uint8_t* data, unsigned size, Request::Flags flags,
+            const std::vector<bool>& byte_enable=std::vector<bool>())
+    {
+        panic("readMem() is not implemented");
+    }
 
-    virtual Fault initiateMemRead(Addr addr, unsigned size,
-                                  Request::Flags flags,
-                                  const std::vector<bool>& byte_enable =
-                                      std::vector<bool>())
-    { panic("initiateMemRead() is not implemented\n"); }
+    virtual Fault
+    initiateMemRead(Addr addr, unsigned size, Request::Flags flags,
+            const std::vector<bool>& byte_enable=std::vector<bool>())
+    {
+        panic("initiateMemRead() is not implemented\n");
+    }
 
-    virtual Fault writeMem(uint8_t* data, unsigned size, Addr addr,
-                           Request::Flags flags, uint64_t* res,
-                           const std::vector<bool>& byte_enable =
-                               std::vector<bool>())
-    { panic("writeMem() is not implemented\n"); }
+    virtual Fault
+    writeMem(uint8_t* data, unsigned size, Addr addr, Request::Flags flags,
+            uint64_t* res,
+            const std::vector<bool>& byte_enable=std::vector<bool>())
+    {
+        panic("writeMem() is not implemented\n");
+    }
 
-    virtual Fault amoMem(Addr addr, uint8_t* data, unsigned size,
-                         Request::Flags flags,
-                         AtomicOpFunctorPtr amo_op)
-    { panic("amoMem() is not implemented\n"); }
+    virtual Fault
+    amoMem(Addr addr, uint8_t* data, unsigned size, Request::Flags flags,
+            AtomicOpFunctorPtr amo_op)
+    {
+        panic("amoMem() is not implemented\n");
+    }
 
-    virtual Fault initiateMemAMO(Addr addr, unsigned size,
-                                 Request::Flags flags,
-                                 AtomicOpFunctorPtr amo_op)
-    { panic("initiateMemAMO() is not implemented\n"); }
+    virtual Fault
+    initiateMemAMO(Addr addr, unsigned size, Request::Flags flags,
+            AtomicOpFunctorPtr amo_op)
+    {
+        panic("initiateMemAMO() is not implemented\n");
+    }
 
     void countInst();
     Counter totalInsts() const override;
@@ -191,5 +202,7 @@ class BaseSimpleCPU : public BaseCPU
      * well. */
     virtual void htmSendAbortSignal(HtmFailureFaultCause cause) = 0;
 };
+
+} // namespace gem5
 
 #endif // __CPU_SIMPLE_BASE_HH__

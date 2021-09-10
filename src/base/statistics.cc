@@ -50,7 +50,12 @@
 #include "base/logging.hh"
 #include "sim/root.hh"
 
-namespace Stats {
+namespace gem5
+{
+
+GEM5_DEPRECATED_NAMESPACE(Stats, statistics);
+namespace statistics
+{
 
 // We wrap these in a function to make sure they're built in time.
 std::list<Info *> &
@@ -94,7 +99,7 @@ InfoAccess::setInfo(Group *parent, Info *info)
 void
 InfoAccess::setParams(const StorageParams *params)
 {
-    info()->storageParams = params;
+    info()->setStorageParams(params);
 }
 
 void
@@ -132,13 +137,13 @@ InfoAccess::info() const
 }
 
 Formula::Formula(Group *parent, const char *name, const char *desc)
-    : DataWrapVec<Formula, FormulaInfoProxy>(parent, name, UNIT_UNSPECIFIED,
-                                             desc)
+    : DataWrapVec<Formula, FormulaInfoProxy>(
+            parent, name, units::Unspecified::get(), desc)
 
 {
 }
 
-Formula::Formula(Group *parent, const char *name, const Units::Base *unit,
+Formula::Formula(Group *parent, const char *name, const units::Base *unit,
                  const char *desc)
     : DataWrapVec<Formula, FormulaInfoProxy>(parent, name, unit, desc)
 {
@@ -146,13 +151,13 @@ Formula::Formula(Group *parent, const char *name, const Units::Base *unit,
 
 Formula::Formula(Group *parent, const char *name, const char *desc,
                  const Temp &r)
-    : DataWrapVec<Formula, FormulaInfoProxy>(parent, name, UNIT_UNSPECIFIED,
-                                             desc)
+    : DataWrapVec<Formula, FormulaInfoProxy>(
+            parent, name, units::Unspecified::get(), desc)
 {
     *this = r;
 }
 
-Formula::Formula(Group *parent, const char *name, const Units::Base *unit,
+Formula::Formula(Group *parent, const char *name, const units::Base *unit,
                  const char *desc, const Temp &r)
     : DataWrapVec<Formula, FormulaInfoProxy>(parent, name, unit, desc)
 {
@@ -292,7 +297,7 @@ dump()
     if (dumpHandler)
         dumpHandler();
     else
-        fatal("No registered Stats::dump handler");
+        fatal("No registered statistics::dump handler");
 }
 
 void
@@ -301,7 +306,7 @@ reset()
     if (resetHandler)
         resetHandler();
     else
-        fatal("No registered Stats::reset handler");
+        fatal("No registered statistics::reset handler");
 }
 
 const Info *
@@ -321,10 +326,12 @@ registerDumpCallback(const std::function<void()> &callback)
     dumpQueue.push_back(callback);
 }
 
-} // namespace Stats
+} // namespace statistics
 
 void
 debugDumpStats()
 {
-    Stats::dump();
+    statistics::dump();
 }
+
+} // namespace gem5

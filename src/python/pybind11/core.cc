@@ -55,11 +55,15 @@
 #include "base/temperature.hh"
 #include "base/types.hh"
 #include "sim/core.hh"
+#include "sim/cur_tick.hh"
 #include "sim/drain.hh"
 #include "sim/serialize.hh"
 #include "sim/sim_object.hh"
 
 namespace py = pybind11;
+
+namespace gem5
+{
 
 /** Resolve a SimObject name using the Pybind configuration */
 class PybindSimObjectResolver : public SimObjectResolver
@@ -179,22 +183,22 @@ init_net(py::module_ &m_native)
 {
     py::module_ m = m_native.def_submodule("net");
 
-    py::class_<Net::EthAddr>(m, "EthAddr")
+    py::class_<networking::EthAddr>(m, "EthAddr")
         .def(py::init<>())
         .def(py::init<const std::string &>())
         ;
 
-    py::class_<Net::IpAddress>(m, "IpAddress")
+    py::class_<networking::IpAddress>(m, "IpAddress")
         .def(py::init<>())
         .def(py::init<uint32_t>())
         ;
 
-    py::class_<Net::IpNetmask, Net::IpAddress>(m, "IpNetmask")
+    py::class_<networking::IpNetmask, networking::IpAddress>(m, "IpNetmask")
         .def(py::init<>())
         .def(py::init<uint32_t, uint8_t>())
         ;
 
-    py::class_<Net::IpWithPort, Net::IpAddress>(m, "IpWithPort")
+    py::class_<networking::IpWithPort, networking::IpAddress>(m, "IpWithPort")
         .def(py::init<>())
         .def(py::init<uint32_t, uint16_t>())
         ;
@@ -205,7 +209,7 @@ init_loader(py::module_ &m_native)
 {
     py::module_ m = m_native.def_submodule("loader");
 
-    m.def("setInterpDir", &Loader::setInterpDir);
+    m.def("setInterpDir", &loader::setInterpDir);
 }
 
 void
@@ -307,10 +311,10 @@ pybind_init_core(py::module_ &m_native)
      * Serialization helpers
      */
     m_core
-        .def("serializeAll", &Serializable::serializeAll)
-        .def("unserializeGlobals", &Serializable::unserializeGlobals)
+        .def("serializeAll", &SimObject::serializeAll)
         .def("getCheckpoint", [](const std::string &cpt_dir) {
-            return new CheckpointIn(cpt_dir, pybindSimObjectResolver);
+            SimObject::setSimObjectResolver(&pybindSimObjectResolver);
+            return new CheckpointIn(cpt_dir);
         })
 
         ;
@@ -323,3 +327,4 @@ pybind_init_core(py::module_ &m_native)
     init_loader(m_native);
 }
 
+} // namespace gem5

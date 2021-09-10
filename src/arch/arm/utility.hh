@@ -42,8 +42,9 @@
 #ifndef __ARCH_ARM_UTILITY_HH__
 #define __ARCH_ARM_UTILITY_HH__
 
-#include "arch/arm/isa_traits.hh"
-#include "arch/arm/miscregs.hh"
+#include "arch/arm/regs/cc.hh"
+#include "arch/arm/regs/int.hh"
+#include "arch/arm/regs/misc.hh"
 #include "arch/arm/types.hh"
 #include "base/logging.hh"
 #include "base/trace.hh"
@@ -51,17 +52,12 @@
 #include "cpu/static_inst.hh"
 #include "cpu/thread_context.hh"
 
+namespace gem5
+{
+
 class ArmSystem;
 
 namespace ArmISA {
-
-inline PCState
-buildRetPC(const PCState &curPC, const PCState &callPC)
-{
-    PCState retPC = callPC;
-    retPC.uEnd();
-    return retPC;
-}
 
 inline bool
 testPredicate(uint32_t nz, uint32_t c, uint32_t v, ConditionCode code)
@@ -90,14 +86,6 @@ testPredicate(uint32_t nz, uint32_t c, uint32_t v, ConditionCode code)
         default:
             panic("Unhandled predicate condition: %d\n", code);
     }
-}
-
-void copyRegs(ThreadContext *src, ThreadContext *dest);
-
-static inline void
-copyMiscRegs(ThreadContext *src, ThreadContext *dest)
-{
-    panic("Copy Misc. Regs Not Implemented Yet\n");
 }
 
 /** Send an event (SEV) to a specific PE if there isn't
@@ -388,12 +376,6 @@ isGenericTimerSystemAccessTrapEL3(const MiscRegIndex miscReg,
 
 bool SPAlignmentCheckEnabled(ThreadContext* tc);
 
-inline void
-advancePC(PCState &pc, const StaticInstPtr &inst)
-{
-    inst->advancePC(pc);
-}
-
 Addr truncPage(Addr addr);
 Addr roundPage(Addr addr);
 
@@ -434,5 +416,7 @@ inline ByteOrder byteOrder(const ThreadContext *tc)
 
 bool isUnpriviledgeAccess(ThreadContext * tc);
 
-}
+} // namespace ArmISA
+} // namespace gem5
+
 #endif

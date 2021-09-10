@@ -40,7 +40,7 @@
 
 #include "arch/x86/faults.hh"
 #include "arch/x86/insts/microldstop.hh"
-#include "arch/x86/isa_traits.hh"
+#include "arch/x86/page_size.hh"
 #include "arch/x86/pagetable.hh"
 #include "arch/x86/pagetable_walker.hh"
 #include "arch/x86/regs/misc.hh"
@@ -60,6 +60,8 @@
 #include "sim/process.hh"
 #include "sim/pseudo_inst.hh"
 
+namespace gem5
+{
 namespace X86ISA
 {
 
@@ -455,11 +457,11 @@ namespace X86ISA
                 SegAttr attr = tc->readMiscRegNoEffect(MISCREG_SEG_ATTR(seg));
 
                 if (seg >= SEGMENT_REG_ES && seg <= SEGMENT_REG_HS) {
-                    if (!attr.writable && (mode == BaseTLB::Write ||
+                    if (!attr.writable && (mode == BaseMMU::Write ||
                         storeCheck))
                         return std::make_shared<GeneralProtection>(0);
 
-                    if (!attr.readable && mode == BaseTLB::Read)
+                    if (!attr.readable && mode == BaseMMU::Read)
                         return std::make_shared<GeneralProtection>(0);
 
                     expandDown = attr.expandDown;
@@ -517,7 +519,7 @@ namespace X86ISA
                         const EmulationPageTable::Entry *pte =
                             p->pTable->lookup(vaddr);
 
-                        if (!pte && mode != BaseTLB::Execute) {
+                        if (!pte && mode != BaseMMU::Execute) {
                             // penalize a "page fault" more
                             if (timing)
                                 latency += missLatency2;
@@ -558,7 +560,7 @@ namespace X86ISA
                 CR0 cr0 = tc->readMiscRegNoEffect(MISCREG_CR0);
                 bool badWrite = (!entry->writable && (inUser || cr0.wp));
 
-                if ((inUser && !entry->user) || (mode == BaseTLB::Write &&
+                if ((inUser && !entry->user) || (mode == BaseMMU::Write &&
                      badWrite)) {
                     // The page must have been present to get into the TLB in
                     // the first place. We'll assume the reserved bits are
@@ -571,7 +573,7 @@ namespace X86ISA
                     // This would fault if this were a write, so return a page
                     // fault that reflects that happening.
                     return std::make_shared<PageFault>(vaddr, true,
-                                                       BaseTLB::Write,
+                                                       BaseMMU::Write,
                                                        inUser, false);
                 }
 
@@ -676,7 +678,7 @@ namespace X86ISA
         TranslationState *sender_state =
                 safe_cast<TranslationState*>(pkt->senderState);
 
-        bool update_stats = !sender_state->prefetch;
+        bool update_stats = !sender_state->isPrefetch;
         ThreadContext * tmp_tc = sender_state->tc;
 
         DPRINTF(GPUTLB, "Translation req. for virt. page addr %#x\n",
@@ -772,7 +774,7 @@ namespace X86ISA
         bool badWrite = (!tlb_entry->writable && (inUser || cr0.wp));
 
         if ((inUser && !tlb_entry->user) ||
-            (mode == BaseTLB::Write && badWrite)) {
+            (mode == BaseMMU::Write && badWrite)) {
             // The page must have been present to get into the TLB in
             // the first place. We'll assume the reserved bits are
             // fine even though we're not checking them.
@@ -891,7 +893,7 @@ namespace X86ISA
             safe_cast<TranslationState*>(pkt->senderState);
 
         int req_cnt = tmp_sender_state->reqCnt.back();
-        bool update_stats = !tmp_sender_state->prefetch;
+        bool update_stats = !tmp_sender_state->isPrefetch;
 
 
         if (outcome == TLB_HIT) {
@@ -960,12 +962,12 @@ namespace X86ISA
 
             Process *p = sender_state->tc->getProcessPtr();
             Addr vaddr = pkt->req->getVaddr();
-    #ifndef NDEBUG
+
             Addr alignedVaddr = p->pTable->pageAlign(vaddr);
             assert(alignedVaddr == virtPageAddr);
-    #endif
+
             const EmulationPageTable::Entry *pte = p->pTable->lookup(vaddr);
-            if (!pte && sender_state->tlbMode != BaseTLB::Execute &&
+            if (!pte && sender_state->tlbMode != BaseMMU::Execute &&
                     p->fixupFault(vaddr)) {
                 pte = p->pTable->lookup(vaddr);
             }
@@ -1102,7 +1104,7 @@ namespace X86ISA
          * This feature could be used to explore security issues around
          * speculative memory accesses.
          */
-        if (!sender_state->prefetch && sender_state->tlbEntry)
+        if (!sender_state->isPrefetch && sender_state->tlbEntry)
             pagingProtectionChecks(tc, pkt, local_entry, mode);
 
         int page_size = local_entry->size();
@@ -1124,7 +1126,7 @@ namespace X86ISA
             safe_cast<TranslationState*>(pkt->senderState);
 
         ThreadContext *tc = sender_state->tc;
-        bool update_stats = !sender_state->prefetch;
+        bool update_stats = !sender_state->isPrefetch;
 
         Addr virt_page_addr = roundDown(pkt->req->getVaddr(),
                                         X86ISA::PageBytes);
@@ -1154,7 +1156,7 @@ namespace X86ISA
                 // there is a TLB below -> propagate down the TLB hierarchy
                 tlb->memSidePort[0]->sendFunctional(pkt);
                 // If no valid translation from a prefetch, then just return
-                if (sender_state->prefetch && !pkt->req->hasPaddr())
+                if (sender_state->isPrefetch && !pkt->req->hasPaddr())
                     return;
             } else {
                 // Need to access the page table and update the TLB
@@ -1164,19 +1166,18 @@ namespace X86ISA
                 Process *p = tc->getProcessPtr();
 
                 Addr vaddr = pkt->req->getVaddr();
-    #ifndef NDEBUG
+
                 Addr alignedVaddr = p->pTable->pageAlign(vaddr);
                 assert(alignedVaddr == virt_page_addr);
-    #endif
 
                 const EmulationPageTable::Entry *pte =
                         p->pTable->lookup(vaddr);
-                if (!pte && sender_state->tlbMode != BaseTLB::Execute &&
+                if (!pte && sender_state->tlbMode != BaseMMU::Execute &&
                         p->fixupFault(vaddr)) {
                     pte = p->pTable->lookup(vaddr);
                 }
 
-                if (!sender_state->prefetch) {
+                if (!sender_state->isPrefetch) {
                     // no PageFaults are permitted after
                     // the second page table lookup
                     assert(pte);
@@ -1431,8 +1432,8 @@ namespace X86ISA
         TLBFootprint.clear();
     }
 
-    GpuTLB::GpuTLBStats::GpuTLBStats(Stats::Group *parent)
-        : Stats::Group(parent),
+    GpuTLB::GpuTLBStats::GpuTLBStats(statistics::Group *parent)
+        : statistics::Group(parent),
           ADD_STAT(localNumTLBAccesses, "Number of TLB accesses"),
           ADD_STAT(localNumTLBHits, "Number of TLB hits"),
           ADD_STAT(localNumTLBMisses, "Number of TLB misses"),
@@ -1456,3 +1457,4 @@ namespace X86ISA
         globalTLBMissRate = 100 * globalNumTLBMisses / globalNumTLBAccesses;
     }
 } // namespace X86ISA
+} // namespace gem5

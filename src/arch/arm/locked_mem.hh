@@ -48,12 +48,14 @@
  * ISA-specific helper functions for locked memory accesses.
  */
 
-#include "arch/arm/miscregs.hh"
-#include "arch/arm/isa_traits.hh"
+#include "arch/arm/regs/misc.hh"
 #include "arch/arm/utility.hh"
 #include "debug/LLSC.hh"
 #include "mem/packet.hh"
 #include "mem/request.hh"
+
+namespace gem5
+{
 
 namespace ArmISA
 {
@@ -161,5 +163,6 @@ globalClearExclusive(XC *xc)
 }
 
 } // namespace ArmISA
+} // namespace gem5
 
 #endif

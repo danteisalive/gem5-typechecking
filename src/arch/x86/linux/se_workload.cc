@@ -40,10 +40,10 @@
 
 #include <sys/syscall.h>
 
-#include "arch/x86/isa_traits.hh"
 #include "arch/x86/linux/linux.hh"
+#include "arch/x86/page_size.hh"
 #include "arch/x86/process.hh"
-#include "arch/x86/registers.hh"
+#include "arch/x86/regs/int.hh"
 #include "arch/x86/se_workload.hh"
 #include "base/trace.hh"
 #include "cpu/thread_context.hh"
@@ -52,6 +52,9 @@
 #include "sim/syscall_desc.hh"
 #include "sim/syscall_emul.hh"
 
+namespace gem5
+{
+
 namespace
 {
 
@@ -59,30 +62,30 @@ class LinuxLoader : public Process::Loader
 {
   public:
     Process *
-    load(const ProcessParams &params, ::Loader::ObjectFile *obj_file)
+    load(const ProcessParams &params, loader::ObjectFile *obj_file)
     {
         auto arch = obj_file->getArch();
         auto opsys = obj_file->getOpSys();
 
-        if (arch != ::Loader::X86_64 && arch != ::Loader::I386)
+        if (arch != loader::X86_64 && arch != loader::I386)
             return nullptr;
 
-        if (opsys == ::Loader::UnknownOpSys) {
+        if (opsys == loader::UnknownOpSys) {
             warn("Unknown operating system; assuming Linux.");
-            opsys = ::Loader::Linux;
+            opsys = loader::Linux;
         }
 
-        if (opsys != ::Loader::Linux)
+        if (opsys != loader::Linux)
             return nullptr;
 
-        if (arch == ::Loader::X86_64)
+        if (arch == loader::X86_64)
             return new X86ISA::X86_64Process(params, obj_file);
         else
             return new X86ISA::I386Process(params, obj_file);
     }
 };
 
-LinuxLoader loader;
+LinuxLoader linuxLoader;
 
 } // anonymous namespace
 
@@ -169,3 +172,4 @@ EmuLinux::pageFault(ThreadContext *tc)
 }
 
 } // namespace X86ISA
+} // namespace gem5

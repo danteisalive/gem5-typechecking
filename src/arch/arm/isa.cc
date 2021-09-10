@@ -47,6 +47,7 @@
 #include "arch/arm/tlbi_op.hh"
 #include "cpu/base.hh"
 #include "cpu/checker/cpu.hh"
+#include "cpu/reg_class.hh"
 #include "debug/Arm.hh"
 #include "debug/MiscRegs.hh"
 #include "dev/arm/generic_timer.hh"
@@ -57,14 +58,24 @@
 #include "sim/stat_control.hh"
 #include "sim/system.hh"
 
+namespace gem5
+{
+
 namespace ArmISA
 {
 
 ISA::ISA(const Params &p) : BaseISA(p), system(NULL),
-    _decoderFlavor(p.decoderFlavor), _vecRegRenameMode(Enums::Full),
-    pmu(p.pmu), impdefAsNop(p.impdef_nop),
+    _decoderFlavor(p.decoderFlavor), pmu(p.pmu), impdefAsNop(p.impdef_nop),
     afterStartup(false)
 {
+    _regClasses.emplace_back(NUM_INTREGS, INTREG_ZERO);
+    _regClasses.emplace_back(0);
+    _regClasses.emplace_back(NumVecRegs);
+    _regClasses.emplace_back(NumVecRegs * TheISA::NumVecElemPerVecReg);
+    _regClasses.emplace_back(NumVecPredRegs);
+    _regClasses.emplace_back(NUM_CCREGS);
+    _regClasses.emplace_back(NUM_MISCREGS);
+
     miscRegs[MISCREG_SCTLR_RST] = 0;
 
     // Hook up a dummy device if we haven't been configured with a
@@ -108,10 +119,6 @@ ISA::ISA(const Params &p) : BaseISA(p), system(NULL),
         haveLSE = true;
         haveTME = true;
     }
-
-    // Initial rename mode depends on highestEL
-    const_cast<Enums::VecRegRenameMode&>(_vecRegRenameMode) =
-        highestELIs64 ? Enums::Full : Enums::Elem;
 
     selfDebug = new SelfDebug();
     initializeMiscRegMetadata();
@@ -481,10 +488,53 @@ ISA::takeOverFrom(ThreadContext *new_tc, ThreadContext *old_tc)
     setupThreadContext();
 }
 
+static void
+copyVecRegs(ThreadContext *src, ThreadContext *dest)
+{
+    auto src_mode = src->getIsaPtr()->vecRegRenameMode(src);
+
+    // The way vector registers are copied (VecReg vs VecElem) is relevant
+    // in the O3 model only.
+    if (src_mode == enums::Full) {
+        for (auto idx = 0; idx < NumVecRegs; idx++)
+            dest->setVecRegFlat(idx, src->readVecRegFlat(idx));
+    } else {
+        for (auto idx = 0; idx < NumVecRegs; idx++)
+            for (auto elem_idx = 0; elem_idx < NumVecElemPerVecReg; elem_idx++)
+                dest->setVecElemFlat(
+                    idx, elem_idx, src->readVecElemFlat(idx, elem_idx));
+    }
+}
+
+void
+ISA::copyRegsFrom(ThreadContext *src)
+{
+    for (int i = 0; i < NUM_INTREGS; i++)
+        tc->setIntRegFlat(i, src->readIntRegFlat(i));
+
+    for (int i = 0; i < NUM_CCREGS; i++)
+        tc->setCCReg(i, src->readCCReg(i));
+
+    for (int i = 0; i < NUM_MISCREGS; i++)
+        tc->setMiscRegNoEffect(i, src->readMiscRegNoEffect(i));
+
+    copyVecRegs(src, tc);
+
+    // setMiscReg "with effect" will set the misc register mapping correctly.
+    // e.g. updateRegMap(val)
+    tc->setMiscReg(MISCREG_CPSR, src->readMiscRegNoEffect(MISCREG_CPSR));
+
+    // Copy over the PC State
+    tc->pcState(src->pcState());
+
+    // Invalidate the tlb misc register cache
+    static_cast<MMU *>(tc->getMMUPtr())->invalidateMiscReg();
+}
+
 RegVal
 ISA::readMiscRegNoEffect(int misc_reg) const
 {
-    assert(misc_reg < NumMiscRegs);
+    assert(misc_reg < NUM_MISCREGS);
 
     const auto &reg = lookUpMiscReg[misc_reg]; // bit masks
     const auto &map = getMiscIndices(misc_reg);
@@ -810,7 +860,7 @@ ISA::readMiscReg(int misc_reg)
 void
 ISA::setMiscRegNoEffect(int misc_reg, RegVal val)
 {
-    assert(misc_reg < NumMiscRegs);
+    assert(misc_reg < NUM_MISCREGS);
 
     const auto &reg = lookUpMiscReg[misc_reg]; // bit masks
     const auto &map = getMiscIndices(misc_reg);
@@ -2026,46 +2076,46 @@ ISA::setMiscReg(int misc_reg, RegVal val)
             misc_reg = MISCREG_IFAR_S;
             break;
           case MISCREG_ATS1CPR:
-            addressTranslation(TLB::S1CTran, BaseTLB::Read, 0, val);
+            addressTranslation(TLB::S1CTran, BaseMMU::Read, 0, val);
             return;
           case MISCREG_ATS1CPW:
-            addressTranslation(TLB::S1CTran, BaseTLB::Write, 0, val);
+            addressTranslation(TLB::S1CTran, BaseMMU::Write, 0, val);
             return;
           case MISCREG_ATS1CUR:
-            addressTranslation(TLB::S1CTran, BaseTLB::Read,
+            addressTranslation(TLB::S1CTran, BaseMMU::Read,
                 TLB::UserMode, val);
             return;
           case MISCREG_ATS1CUW:
-            addressTranslation(TLB::S1CTran, BaseTLB::Write,
+            addressTranslation(TLB::S1CTran, BaseMMU::Write,
                 TLB::UserMode, val);
             return;
           case MISCREG_ATS12NSOPR:
             if (!haveSecurity)
                 panic("Security Extensions required for ATS12NSOPR");
-            addressTranslation(TLB::S1S2NsTran, BaseTLB::Read, 0, val);
+            addressTranslation(TLB::S1S2NsTran, BaseMMU::Read, 0, val);
             return;
           case MISCREG_ATS12NSOPW:
             if (!haveSecurity)
                 panic("Security Extensions required for ATS12NSOPW");
-            addressTranslation(TLB::S1S2NsTran, BaseTLB::Write, 0, val);
+            addressTranslation(TLB::S1S2NsTran, BaseMMU::Write, 0, val);
             return;
           case MISCREG_ATS12NSOUR:
             if (!haveSecurity)
                 panic("Security Extensions required for ATS12NSOUR");
-            addressTranslation(TLB::S1S2NsTran, BaseTLB::Read,
+            addressTranslation(TLB::S1S2NsTran, BaseMMU::Read,
                 TLB::UserMode, val);
             return;
           case MISCREG_ATS12NSOUW:
             if (!haveSecurity)
                 panic("Security Extensions required for ATS12NSOUW");
-            addressTranslation(TLB::S1S2NsTran, BaseTLB::Write,
+            addressTranslation(TLB::S1S2NsTran, BaseMMU::Write,
                 TLB::UserMode, val);
             return;
           case MISCREG_ATS1HR:
-            addressTranslation(TLB::HypMode, BaseTLB::Read, 0, val);
+            addressTranslation(TLB::HypMode, BaseMMU::Read, 0, val);
             return;
           case MISCREG_ATS1HW:
-            addressTranslation(TLB::HypMode, BaseTLB::Write, 0, val);
+            addressTranslation(TLB::HypMode, BaseMMU::Write, 0, val);
             return;
           case MISCREG_TTBCR:
             {
@@ -2130,6 +2180,7 @@ ISA::setMiscReg(int misc_reg, RegVal val)
           case MISCREG_TCR_EL1:
           case MISCREG_TCR_EL2:
           case MISCREG_TCR_EL3:
+          case MISCREG_VTCR_EL2:
           case MISCREG_SCTLR_EL2:
           case MISCREG_SCTLR_EL3:
           case MISCREG_HSCTLR:
@@ -2201,44 +2252,44 @@ ISA::setMiscReg(int misc_reg, RegVal val)
             }
             break;
           case MISCREG_AT_S1E1R_Xt:
-            addressTranslation64(TLB::S1E1Tran, BaseTLB::Read, 0, val);
+            addressTranslation64(TLB::S1E1Tran, BaseMMU::Read, 0, val);
             return;
           case MISCREG_AT_S1E1W_Xt:
-            addressTranslation64(TLB::S1E1Tran, BaseTLB::Write, 0, val);
+            addressTranslation64(TLB::S1E1Tran, BaseMMU::Write, 0, val);
             return;
           case MISCREG_AT_S1E0R_Xt:
-            addressTranslation64(TLB::S1E0Tran, BaseTLB::Read,
+            addressTranslation64(TLB::S1E0Tran, BaseMMU::Read,
                 TLB::UserMode, val);
             return;
           case MISCREG_AT_S1E0W_Xt:
-            addressTranslation64(TLB::S1E0Tran, BaseTLB::Write,
+            addressTranslation64(TLB::S1E0Tran, BaseMMU::Write,
                 TLB::UserMode, val);
             return;
           case MISCREG_AT_S1E2R_Xt:
-            addressTranslation64(TLB::S1E2Tran, BaseTLB::Read, 0, val);
+            addressTranslation64(TLB::S1E2Tran, BaseMMU::Read, 0, val);
             return;
           case MISCREG_AT_S1E2W_Xt:
-            addressTranslation64(TLB::S1E2Tran, BaseTLB::Write, 0, val);
+            addressTranslation64(TLB::S1E2Tran, BaseMMU::Write, 0, val);
             return;
           case MISCREG_AT_S12E1R_Xt:
-            addressTranslation64(TLB::S12E1Tran, BaseTLB::Read, 0, val);
+            addressTranslation64(TLB::S12E1Tran, BaseMMU::Read, 0, val);
             return;
           case MISCREG_AT_S12E1W_Xt:
-            addressTranslation64(TLB::S12E1Tran, BaseTLB::Write, 0, val);
+            addressTranslation64(TLB::S12E1Tran, BaseMMU::Write, 0, val);
             return;
           case MISCREG_AT_S12E0R_Xt:
-            addressTranslation64(TLB::S12E0Tran, BaseTLB::Read,
+            addressTranslation64(TLB::S12E0Tran, BaseMMU::Read,
                 TLB::UserMode, val);
             return;
           case MISCREG_AT_S12E0W_Xt:
-            addressTranslation64(TLB::S12E0Tran, BaseTLB::Write,
+            addressTranslation64(TLB::S12E0Tran, BaseMMU::Write,
                 TLB::UserMode, val);
             return;
           case MISCREG_AT_S1E3R_Xt:
-            addressTranslation64(TLB::S1E3Tran, BaseTLB::Read, 0, val);
+            addressTranslation64(TLB::S1E3Tran, BaseMMU::Read, 0, val);
             return;
           case MISCREG_AT_S1E3W_Xt:
-            addressTranslation64(TLB::S1E3Tran, BaseTLB::Write, 0, val);
+            addressTranslation64(TLB::S1E3Tran, BaseMMU::Write, 0, val);
             return;
           case MISCREG_SPSR_EL3:
           case MISCREG_SPSR_EL2:
@@ -2348,15 +2399,6 @@ ISA::getCurSveVecLenInBits() const
 }
 
 void
-ISA::zeroSveVecRegUpperPart(VecRegContainer &vc, unsigned eCount)
-{
-    auto vv = vc.as<uint64_t>();
-    for (int i = 2; i < eCount; ++i) {
-        vv[i] = 0;
-    }
-}
-
-void
 ISA::serialize(CheckpointOut &cp) const
 {
     DPRINTF(Checkpoint, "Serializing Arm Misc Registers\n");
@@ -2374,7 +2416,7 @@ ISA::unserialize(CheckpointIn &cp)
 
 void
 ISA::addressTranslation64(TLB::ArmTranslationType tran_type,
-    BaseTLB::Mode mode, Request::Flags flags, RegVal val)
+    BaseMMU::Mode mode, Request::Flags flags, RegVal val)
 {
     // If we're in timing mode then doing the translation in
     // functional mode then we're slightly distorting performance
@@ -2425,7 +2467,7 @@ ISA::addressTranslation64(TLB::ArmTranslationType tran_type,
 
 void
 ISA::addressTranslation(TLB::ArmTranslationType tran_type,
-    BaseTLB::Mode mode, Request::Flags flags, RegVal val)
+    BaseMMU::Mode mode, Request::Flags flags, RegVal val)
 {
     // If we're in timing mode then doing the translation in
     // functional mode then we're slightly distorting performance
@@ -2502,4 +2544,5 @@ ISA::MiscRegLUTEntryInitializer::highest(ArmSystem *const sys) const
     return *this;
 }
 
-}  // namespace ArmISA
+} // namespace ArmISA
+} // namespace gem5

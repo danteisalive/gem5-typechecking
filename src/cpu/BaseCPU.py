@@ -89,6 +89,7 @@ class BaseCPU(ClockedObject):
     type = 'BaseCPU'
     abstract = True
     cxx_header = "cpu/base.hh"
+    cxx_class = 'gem5::BaseCPU'
 
     cxx_exports = [
         PyBindMethod("switchOut"),
@@ -145,9 +146,6 @@ class BaseCPU(ClockedObject):
         "enable checkpoint pseudo instructions")
     do_statistics_insts = Param.Bool(True,
         "enable statistics pseudo instructions")
-
-    wait_for_remote_gdb = Param.Bool(False,
-        "Wait for a remote GDB connection");
 
     workload = VectorParam.Process([], "processes to run")
 
@@ -237,7 +235,7 @@ class BaseCPU(ClockedObject):
             # Checker doesn't need its own tlb caches because it does
             # functional accesses only
             if self.checker != NULL:
-                self._cached_ports += [ ".".join("checker", port) \
+                self._cached_ports += [ "checker." + port
                     for port in ArchMMU.walkerPorts() ]
 
     def addTwoLevelCacheHierarchy(self, ic, dc, l2c, iwc=None, dwc=None,

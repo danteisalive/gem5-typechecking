@@ -934,7 +934,7 @@ def NextEthernetAddr():
     return value
 
 class EthernetAddr(ParamValue):
-    cxx_type = 'Net::EthAddr'
+    cxx_type = 'networking::EthAddr'
     ex_str = "00:90:00:00:00:01"
     cmd_line_settable = True
 
@@ -981,13 +981,13 @@ class EthernetAddr(ParamValue):
 
     @classmethod
     def cxx_ini_parse(self, code, src, dest, ret):
-        code('%s = Net::EthAddr(%s);' % (dest, src))
+        code('%s = networking::EthAddr(%s);' % (dest, src))
         code('%s true;' % ret)
 
 # When initializing an IpAddress, pass in an existing IpAddress, a string of
 # the form "a.b.c.d", or an integer representing an IP.
 class IpAddress(ParamValue):
-    cxx_type = 'Net::IpAddress'
+    cxx_type = 'networking::IpAddress'
     ex_str = "127.0.0.1"
     cmd_line_settable = True
 
@@ -1039,7 +1039,7 @@ class IpAddress(ParamValue):
 # the form "a.b.c.d/n" or "a.b.c.d/e.f.g.h", or an ip and netmask as
 # positional or keyword arguments.
 class IpNetmask(IpAddress):
-    cxx_type = 'Net::IpNetmask'
+    cxx_type = 'networking::IpNetmask'
     ex_str = "127.0.0.0/24"
     cmd_line_settable = True
 
@@ -1113,7 +1113,7 @@ class IpNetmask(IpAddress):
 # When initializing an IpWithPort, pass in an existing IpWithPort, a string of
 # the form "a.b.c.d:p", or an ip and port as positional or keyword arguments.
 class IpWithPort(IpAddress):
-    cxx_type = 'Net::IpWithPort'
+    cxx_type = 'networking::IpWithPort'
     ex_str = "127.0.0.1:80"
     cmd_line_settable = True
 
@@ -1308,7 +1308,7 @@ class MetaEnum(MetaParamValue):
         if cls.is_class:
             cls.cxx_type = '%s' % name
         else:
-            cls.cxx_type = 'Enums::%s' % name
+            cls.cxx_type = 'enums::%s' % name
 
         super(MetaEnum, cls).__init__(name, bases, init_dict)
 
@@ -1325,15 +1325,19 @@ class MetaEnum(MetaParamValue):
 #ifndef $idem_macro
 #define $idem_macro
 
+namespace gem5
+{
 ''')
         if cls.is_class:
             code('''\
-enum class $name {
+enum class $name
+{
 ''')
         else:
             code('''\
 $wrapper $wrapper_name {
-    enum $name {
+    enum $name
+    {
 ''')
             code.indent(1)
         code.indent(1)
@@ -1354,7 +1358,10 @@ extern const char *${name}Strings[static_cast<int>(${name}::Num_${name})];
 
         if not cls.is_class:
             code.dedent(1)
-            code('};')
+            code('}; // $wrapper_name')
+
+        code()
+        code('} // namespace gem5')
 
         code()
         code('#endif // $idem_macro')
@@ -1364,7 +1371,14 @@ extern const char *${name}Strings[static_cast<int>(${name}::Num_${name})];
         file_name = cls.__name__
         name = cls.__name__ if cls.enum_name is None else cls.enum_name
 
+        code('#include "base/compiler.hh"')
         code('#include "enums/$file_name.hh"')
+
+        code()
+        code('namespace gem5')
+        code('{')
+        code()
+
         if cls.wrapper_is_struct:
             code('const char *${wrapper_name}::${name}Strings'
                 '[Num_${name}] =')
@@ -1374,7 +1388,9 @@ extern const char *${name}Strings[static_cast<int>(${name}::Num_${name})];
 const char *${name}Strings[static_cast<int>(${name}::Num_${name})] =
 ''')
             else:
-                code('namespace Enums {')
+                code('''GEM5_DEPRECATED_NAMESPACE(Enums, enums);
+namespace enums
+{''')
                 code.indent(1)
                 code('const char *${name}Strings[Num_${name}] =')
 
@@ -1387,7 +1403,9 @@ const char *${name}Strings[static_cast<int>(${name}::Num_${name})] =
 
         if not cls.wrapper_is_struct and not cls.is_class:
             code.dedent(1)
-            code('} // namespace $wrapper_name')
+            code('} // namespace enums')
+
+        code('} // namespace gem5')
 
 
     def pybind_def(cls, code):
@@ -1401,6 +1419,9 @@ const char *${name}Strings[static_cast<int>(${name}::Num_${name})] =
 #include <sim/init.hh>
 
 namespace py = pybind11;
+
+namespace gem5
+{
 
 static void
 module_init(py::module_ &m_internal)
@@ -1427,6 +1448,8 @@ module_init(py::module_ &m_internal)
         code.dedent()
         code()
         code('static EmbeddedPyBind embed_enum("enum_${name}", module_init);')
+        code()
+        code('} // namespace gem5')
 
 
 # Base class for enum types.
@@ -1435,7 +1458,7 @@ class Enum(ParamValue, metaclass=MetaEnum):
     cmd_line_settable = True
 
     # The name of the wrapping namespace or struct
-    wrapper_name = 'Enums'
+    wrapper_name = 'enums'
 
     # If true, the enum is wrapped in a struct rather than a namespace
     wrapper_is_struct = False
@@ -1466,7 +1489,7 @@ class Enum(ParamValue, metaclass=MetaEnum):
             code('} else if (%s == "%s") {' % (src, elem_name))
             code.indent()
             name = cls.__name__ if cls.enum_name is None else cls.enum_name
-            code('%s = %s::%s;' % (dest, name if cls.is_class else 'Enums',
+            code('%s = %s::%s;' % (dest, name if cls.is_class else 'enums',
                                    elem_name))
             code('%s true;' % ret)
             code.dedent()
@@ -1705,12 +1728,15 @@ class Temperature(ParamValue):
         self.__init__(value)
         return value
 
+    def __str__(self):
+        return str(self.value)
+
     def getValue(self):
         from _m5.core import Temperature
-        return Temperature.fromKelvin(self.value)
+        return Temperature.from_kelvin(self.value)
 
     def config_value(self):
-        return self
+        return self.value
 
     @classmethod
     def cxx_predecls(cls, code):

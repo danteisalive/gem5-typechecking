@@ -56,6 +56,8 @@ else:
 class System(SimObject):
     type = 'System'
     cxx_header = "sim/system.hh"
+    cxx_class = 'gem5::System'
+
     system_port = RequestPort("System port")
 
     cxx_exports = [
@@ -82,6 +84,10 @@ class System(SimObject):
     # such that these can be passed from the I/O subsystem through an
     # I/O bridge or cache
     mem_ranges = VectorParam.AddrRange([], "Ranges that constitute main memory")
+
+    # The ranges backed by a shadowed ROM
+    shadow_rom_ranges = VectorParam.AddrRange([], "Ranges  backed by a " \
+                                                  "shadowed ROM")
 
     shared_backstore = Param.String("", "backstore's shmem segment filename, "
         "use to directly address the backstore from another host-OS process. "

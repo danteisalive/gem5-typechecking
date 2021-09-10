@@ -46,6 +46,10 @@
 #include "params/InstPBTrace.hh"
 #include "proto/inst.pb.h"
 #include "sim/core.hh"
+#include "sim/cur_tick.hh"
+
+namespace gem5
+{
 
 namespace Trace {
 
@@ -86,7 +90,7 @@ InstPBTrace::createTraceFile(std::string filename)
     ProtoMessage::InstHeader header_msg;
     header_msg.set_obj_id("gem5 generated instruction trace");
     header_msg.set_ver(0);
-    header_msg.set_tick_freq(SimClock::Frequency);
+    header_msg.set_tick_freq(sim_clock::Frequency);
     header_msg.set_has_mem(true);
     traceStream->write(header_msg);
 
@@ -120,7 +124,7 @@ InstPBTrace::getInstRecord(Tick when, ThreadContext *tc, const StaticInstPtr si,
                            TheISA::PCState pc, const StaticInstPtr mi)
 {
     // Only record the trace if Exec debugging is enabled
-    if (!Debug::ExecEnable)
+    if (!debug::ExecEnable)
         return NULL;
 
     return new InstPBTraceRecord(*this, when, tc, si, pc, mi);
@@ -174,3 +178,4 @@ InstPBTrace::traceMem(StaticInstPtr si, Addr a, Addr s, unsigned f)
 }
 
 } // namespace Trace
+} // namespace gem5

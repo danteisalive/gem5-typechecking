@@ -3,6 +3,7 @@
  * Copyright 2007-2008 The Florida State University
  * Copyright 2009 The University of Edinburgh
  * Copyright 2020 Google Inc.
+ * Copyright 2021 IBM Corporation
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -38,6 +39,9 @@
 #include "cpu/thread_context.hh"
 #include "sim/syscall_emul.hh"
 
+namespace gem5
+{
+
 namespace
 {
 
@@ -45,26 +49,31 @@ class LinuxLoader : public Process::Loader
 {
   public:
     Process *
-    load(const ProcessParams &params, ::Loader::ObjectFile *obj) override
+    load(const ProcessParams &params, loader::ObjectFile *obj) override
     {
-        if (obj->getArch() != ::Loader::Power)
+        auto arch = obj->getArch();
+
+        if (arch != loader::Power && arch != loader::Power64)
             return nullptr;
 
         auto opsys = obj->getOpSys();
 
-        if (opsys == ::Loader::UnknownOpSys) {
+        if (opsys == loader::UnknownOpSys) {
             warn("Unknown operating system; assuming Linux.");
-            opsys = ::Loader::Linux;
+            opsys = loader::Linux;
         }
 
-        if (opsys != ::Loader::Linux)
+        if ((arch == loader::Power && opsys != loader::Linux) ||
+            (arch == loader::Power64 &&
+             opsys != loader::LinuxPower64ABIv1 &&
+             opsys != loader::LinuxPower64ABIv2))
             return nullptr;
 
         return new PowerProcess(params, obj);
     }
 };
 
-LinuxLoader loader;
+LinuxLoader linuxLoader;
 
 } // anonymous namespace
 
@@ -218,7 +227,7 @@ SyscallDescTable<PowerISA::SEWorkload::SyscallABI> EmuLinux::syscallDescs = {
     { 117, "ipc" },
     { 118, "fsync" },
     { 119, "sigreturn" },
-    { 120, "clone" },
+    { 120, "clone", cloneBackwardsFunc<PowerLinux> },
     { 121, "setdomainname" },
     { 122, "uname", unameFunc },
     { 123, "modify_ldt" },
@@ -448,3 +457,4 @@ SyscallDescTable<PowerISA::SEWorkload::SyscallABI> EmuLinux::syscallDescs = {
 };
 
 } // namespace PowerISA
+} // namespace gem5

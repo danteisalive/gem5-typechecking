@@ -41,6 +41,9 @@
 #include "gpu-compute/shader.hh"
 #include "gpu-compute/wavefront.hh"
 
+namespace gem5
+{
+
 ScalarMemPipeline::ScalarMemPipeline(const ComputeUnitParams &p,
                                      ComputeUnit &cu)
     : computeUnit(cu), _name(cu.name() + ".ScalarMemPipeline"),
@@ -140,3 +143,23 @@ ScalarMemPipeline::exec()
                 computeUnit.cu_id, mp->simdId, mp->wfSlotId);
     }
 }
+
+void
+ScalarMemPipeline::issueRequest(GPUDynInstPtr gpuDynInst)
+{
+    Wavefront *wf = gpuDynInst->wavefront();
+    if (gpuDynInst->isLoad()) {
+        wf->scalarRdGmReqsInPipe--;
+        wf->scalarOutstandingReqsRdGm++;
+    } else if (gpuDynInst->isStore()) {
+        wf->scalarWrGmReqsInPipe--;
+        wf->scalarOutstandingReqsWrGm++;
+    }
+
+    wf->outstandingReqs++;
+    wf->validateRequestCounters();
+
+    issuedRequests.push(gpuDynInst);
+}
+
+} // namespace gem5

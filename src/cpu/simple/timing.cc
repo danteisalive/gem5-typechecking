@@ -42,7 +42,7 @@
 #include "cpu/simple/timing.hh"
 
 #include "arch/locked_mem.hh"
-#include "arch/utility.hh"
+#include "base/compiler.hh"
 #include "config/the_isa.hh"
 #include "cpu/exetrace.hh"
 #include "debug/Config.hh"
@@ -57,6 +57,9 @@
 #include "sim/faults.hh"
 #include "sim/full_system.hh"
 #include "sim/system.hh"
+
+namespace gem5
+{
 
 void
 TimingSimpleCPU::init()
@@ -167,7 +170,7 @@ void
 TimingSimpleCPU::switchOut()
 {
     SimpleExecContext& t_info = *threadInfo[curThread];
-    M5_VAR_USED SimpleThread* thread = t_info.thread;
+    GEM5_VAR_USED SimpleThread* thread = t_info.thread;
 
     // hardware transactional memory
     // Cannot switch out the CPU in the middle of a transaction
@@ -455,7 +458,7 @@ TimingSimpleCPU::initiateMemRead(Addr addr, unsigned size,
     Fault fault;
     const Addr pc = thread->instAddr();
     unsigned block_size = cacheLineSize();
-    BaseTLB::Mode mode = BaseTLB::Read;
+    BaseMMU::Mode mode = BaseMMU::Read;
 
     if (traceData)
         traceData->setMem(addr, size, flags);
@@ -529,7 +532,7 @@ TimingSimpleCPU::writeMem(uint8_t *data, unsigned size,
     uint8_t *newData = new uint8_t[size];
     const Addr pc = thread->instAddr();
     unsigned block_size = cacheLineSize();
-    BaseTLB::Mode mode = BaseTLB::Write;
+    BaseMMU::Mode mode = BaseMMU::Write;
 
     if (data == NULL) {
         assert(flags & Request::STORE_NO_DATA);
@@ -593,7 +596,7 @@ TimingSimpleCPU::initiateMemAMO(Addr addr, unsigned size,
     Fault fault;
     const Addr pc = thread->instAddr();
     unsigned block_size = cacheLineSize();
-    BaseTLB::Mode mode = BaseTLB::Write;
+    BaseMMU::Mode mode = BaseMMU::Write;
 
     if (traceData)
         traceData->setMem(addr, size, flags);
@@ -659,10 +662,10 @@ TimingSimpleCPU::finishTranslation(WholeTranslationState *state)
     } else {
         if (!state->isSplit) {
             sendData(state->mainReq, state->data, state->res,
-                     state->mode == BaseTLB::Read);
+                     state->mode == BaseMMU::Read);
         } else {
             sendSplitData(state->sreqLow, state->sreqHigh, state->mainReq,
-                          state->data, state->mode == BaseTLB::Read);
+                          state->data, state->mode == BaseMMU::Read);
         }
     }
 
@@ -702,7 +705,7 @@ TimingSimpleCPU::fetch()
         setupFetchRequest(ifetch_req);
         DPRINTF(SimpleCPU, "Translating address %#x\n", ifetch_req->getVaddr());
         thread->mmu->translateTiming(ifetch_req, thread->getTC(),
-                &fetchTranslation, BaseTLB::Execute);
+                &fetchTranslation, BaseMMU::Execute);
     } else {
         _status = IcacheWaitResponse;
         completeIfetch(NULL);
@@ -717,11 +720,13 @@ void
 TimingSimpleCPU::sendFetch(const Fault &fault, const RequestPtr &req,
                            ThreadContext *tc)
 {
+    auto &decoder = threadInfo[curThread]->thread->decoder;
+
     if (fault == NoFault) {
         DPRINTF(SimpleCPU, "Sending fetch for addr %#x(pa: %#x)\n",
                 req->getVaddr(), req->getPaddr());
         ifetch_pkt = new Packet(req, MemCmd::ReadReq);
-        ifetch_pkt->dataStatic(&inst);
+        ifetch_pkt->dataStatic(decoder.moreBytesPtr());
         DPRINTF(SimpleCPU, " -- pkt addr: %#x\n", ifetch_pkt->getAddr());
 
         if (!icachePort.sendTimingReq(ifetch_pkt)) {
@@ -799,6 +804,8 @@ TimingSimpleCPU::advanceInst(const Fault &fault)
 
     if (tryCompleteDrain())
         return;
+
+    serviceInstCountEvents();
 
     if (_status == BaseSimpleCPU::Running) {
         // kick off fetch of next instruction... callback from icache
@@ -938,7 +945,7 @@ TimingSimpleCPU::completeDataAccess(PacketPtr pkt)
     // hardware transactional memory
 
     SimpleExecContext *t_info = threadInfo[curThread];
-    M5_VAR_USED const bool is_htm_speculative =
+    GEM5_VAR_USED const bool is_htm_speculative =
         t_info->inHtmTransactionalState();
 
     // received a response from the dcache: complete the load or store
@@ -1285,3 +1292,5 @@ TimingSimpleCPU::htmSendAbortSignal(HtmFailureFaultCause cause)
 
     sendData(req, data, nullptr, true);
 }
+
+} // namespace gem5

@@ -55,6 +55,9 @@
 #include "sim/clocked_object.hh"
 #include "sim/sim_object.hh"
 
+namespace gem5
+{
+
 class BaseTLB;
 class Packet;
 class ThreadContext;
@@ -75,7 +78,7 @@ namespace X86ISA
         GpuTLB(const Params &p);
         ~GpuTLB();
 
-        typedef enum BaseTLB::Mode Mode;
+        typedef enum BaseMMU::Mode Mode;
 
         class Translation
         {
@@ -293,7 +296,7 @@ namespace X86ISA
             */
             TlbEntry *tlbEntry;
             // Is this a TLB prefetch request?
-            bool prefetch;
+            bool isPrefetch;
             // When was the req for this translation issued
             uint64_t issueTime;
             // Remember where this came from
@@ -307,10 +310,10 @@ namespace X86ISA
             Packet::SenderState *saved;
 
             TranslationState(Mode tlb_mode, ThreadContext *_tc,
-                             bool _prefetch=false,
+                             bool is_prefetch=false,
                              Packet::SenderState *_saved=nullptr)
                 : tlbMode(tlb_mode), tc(_tc), tlbEntry(nullptr),
-                  prefetch(_prefetch), issueTime(0),
+                  isPrefetch(is_prefetch), issueTime(0),
                   hitLevel(0),saved(_saved) { }
         };
 
@@ -400,39 +403,41 @@ namespace X86ISA
         EventFunctionWrapper exitEvent;
 
       protected:
-        struct GpuTLBStats : public Stats::Group
+        struct GpuTLBStats : public statistics::Group
         {
-            GpuTLBStats(Stats::Group *parent);
+            GpuTLBStats(statistics::Group *parent);
 
             // local_stats are as seen from the TLB
             // without taking into account coalescing
-            Stats::Scalar localNumTLBAccesses;
-            Stats::Scalar localNumTLBHits;
-            Stats::Scalar localNumTLBMisses;
-            Stats::Formula localTLBMissRate;
+            statistics::Scalar localNumTLBAccesses;
+            statistics::Scalar localNumTLBHits;
+            statistics::Scalar localNumTLBMisses;
+            statistics::Formula localTLBMissRate;
 
             // global_stats are as seen from the
             // CU's perspective taking into account
             // all coalesced requests.
-            Stats::Scalar globalNumTLBAccesses;
-            Stats::Scalar globalNumTLBHits;
-            Stats::Scalar globalNumTLBMisses;
-            Stats::Formula globalTLBMissRate;
+            statistics::Scalar globalNumTLBAccesses;
+            statistics::Scalar globalNumTLBHits;
+            statistics::Scalar globalNumTLBMisses;
+            statistics::Formula globalTLBMissRate;
 
             // from the CU perspective (global)
-            Stats::Scalar accessCycles;
+            statistics::Scalar accessCycles;
             // from the CU perspective (global)
-            Stats::Scalar pageTableCycles;
-            Stats::Scalar numUniquePages;
+            statistics::Scalar pageTableCycles;
+            statistics::Scalar numUniquePages;
             // from the perspective of this TLB
-            Stats::Scalar localCycles;
+            statistics::Scalar localCycles;
             // from the perspective of this TLB
-            Stats::Formula localLatency;
+            statistics::Formula localLatency;
             // I take the avg. per page and then
             // the avg. over all pages.
-            Stats::Scalar avgReuseDistance;
+            statistics::Scalar avgReuseDistance;
         } stats;
     };
 }
+
+} // namespace gem5
 
 #endif // __GPU_TLB_HH__

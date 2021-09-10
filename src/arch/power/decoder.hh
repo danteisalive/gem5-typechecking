@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2012 Google
+ * Copyright (c) 2021 IBM Corporation
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -35,6 +36,9 @@
 #include "cpu/static_inst.hh"
 #include "debug/Decode.hh"
 
+namespace gem5
+{
+
 namespace PowerISA
 {
 
@@ -47,9 +51,7 @@ class Decoder : public InstDecoder
     bool instDone;
 
   public:
-    Decoder(ISA* isa = nullptr) : instDone(false)
-    {
-    }
+    Decoder(ISA* isa=nullptr) : InstDecoder(&emi), instDone(false) {}
 
     void
     process()
@@ -65,18 +67,10 @@ class Decoder : public InstDecoder
     // Use this to give data to the predecoder. This should be used
     // when there is control flow.
     void
-    moreBytes(const PCState &pc, Addr fetchPC, MachInst inst)
+    moreBytes(const PCState &pc, Addr fetchPC)
     {
-        emi = betoh(inst);
+        emi = gtoh(emi, pc.byteOrder());
         instDone = true;
-    }
-
-    // Use this to give data to the predecoder. This should be used
-    // when instructions are executed in order.
-    void
-    moreBytes(MachInst machInst)
-    {
-        moreBytes(0, 0, machInst);
     }
 
     bool
@@ -96,8 +90,8 @@ class Decoder : public InstDecoder
   protected:
     /// A cache of decoded instruction objects.
     static GenericISA::BasicDecodeCache<Decoder, ExtMachInst> defaultCache;
+    friend class GenericISA::BasicDecodeCache<Decoder, ExtMachInst>;
 
-  public:
     StaticInstPtr decodeInst(ExtMachInst mach_inst);
 
     /// Decode a machine instruction.
@@ -112,6 +106,7 @@ class Decoder : public InstDecoder
         return si;
     }
 
+  public:
     StaticInstPtr
     decode(PowerISA::PCState &nextPC)
     {
@@ -123,5 +118,6 @@ class Decoder : public InstDecoder
 };
 
 } // namespace PowerISA
+} // namespace gem5
 
 #endif // __ARCH_POWER_DECODER_HH__

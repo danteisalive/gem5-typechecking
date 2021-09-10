@@ -38,10 +38,14 @@
 #ifndef __ARCH_ARM_MMU_HH__
 #define __ARCH_ARM_MMU_HH__
 
+#include "arch/arm/table_walker.hh"
 #include "arch/arm/tlb.hh"
 #include "arch/generic/mmu.hh"
 
 #include "params/ArmMMU.hh"
+
+namespace gem5
+{
 
 namespace ArmISA {
 
@@ -60,6 +64,20 @@ class MMU : public BaseMMU
         return static_cast<ArmISA::TLB *>(itb);
     }
 
+    TLB * getTlb(BaseMMU::Mode mode, bool stage2) const;
+
+  protected:
+    TLB *itbStage2;
+    TLB *dtbStage2;
+
+    TableWalker::Port iport;
+    TableWalker::Port dport;
+
+    TableWalker *itbWalker;
+    TableWalker *dtbWalker;
+    TableWalker *itbStage2Walker;
+    TableWalker *dtbStage2Walker;
+
   public:
     enum TLBType
     {
@@ -68,14 +86,25 @@ class MMU : public BaseMMU
         ALL_TLBS = 0x11
     };
 
-    MMU(const ArmMMUParams &p)
-      : BaseMMU(p)
-    {}
+    MMU(const ArmMMUParams &p);
+
+    void init() override;
 
     bool translateFunctional(ThreadContext *tc, Addr vaddr, Addr &paddr);
 
     Fault translateFunctional(const RequestPtr &req, ThreadContext *tc,
-        BaseTLB::Mode mode, TLB::ArmTranslationType tran_type);
+        BaseMMU::Mode mode, TLB::ArmTranslationType tran_type);
+
+    Fault translateFunctional(const RequestPtr &req, ThreadContext *tc,
+        BaseMMU::Mode mode, TLB::ArmTranslationType tran_type,
+        bool stage2);
+
+    using BaseMMU::translateAtomic;
+    Fault translateAtomic(const RequestPtr &req, ThreadContext *tc,
+        BaseMMU::Mode mode, bool stage2);
+
+    void translateTiming(const RequestPtr &req, ThreadContext *tc,
+        BaseMMU::Translation *translation, BaseMMU::Mode mode, bool stage2);
 
     void invalidateMiscReg(TLBType type = ALL_TLBS);
 
@@ -83,8 +112,29 @@ class MMU : public BaseMMU
     void
     flush(const OP &tlbi_op)
     {
-        getITBPtr()->flush(tlbi_op);
-        getDTBPtr()->flush(tlbi_op);
+        if (tlbi_op.stage1Flush()) {
+            flushStage1(tlbi_op);
+        }
+
+        if (tlbi_op.stage2Flush()) {
+            flushStage2(tlbi_op.makeStage2());
+        }
+    }
+
+    template <typename OP>
+    void
+    flushStage1(const OP &tlbi_op)
+    {
+        iflush(tlbi_op);
+        dflush(tlbi_op);
+    }
+
+    template <typename OP>
+    void
+    flushStage2(const OP &tlbi_op)
+    {
+        itbStage2->flush(tlbi_op);
+        dtbStage2->flush(tlbi_op);
     }
 
     template <typename OP>
@@ -99,6 +149,14 @@ class MMU : public BaseMMU
     dflush(const OP &tlbi_op)
     {
         getDTBPtr()->flush(tlbi_op);
+    }
+
+    void
+    flushAll() override
+    {
+        BaseMMU::flushAll();
+        itbStage2->flushAll();
+        dtbStage2->flushAll();
     }
 
     uint64_t
@@ -117,7 +175,7 @@ getMMUPtr(T *tc)
     return mmu;
 }
 
-
 } // namespace ArmISA
+} // namespace gem5
 
 #endif // __ARCH_ARM_MMU_HH__

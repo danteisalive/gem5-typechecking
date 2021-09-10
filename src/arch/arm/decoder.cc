@@ -41,11 +41,13 @@
 #include "arch/arm/decoder.hh"
 
 #include "arch/arm/isa.hh"
-#include "arch/arm/isa_traits.hh"
 #include "arch/arm/utility.hh"
 #include "base/trace.hh"
 #include "debug/Decoder.hh"
 #include "sim/full_system.hh"
+
+namespace gem5
+{
 
 namespace ArmISA
 {
@@ -53,7 +55,7 @@ namespace ArmISA
 GenericISA::BasicDecodeCache<Decoder, ExtMachInst> Decoder::defaultCache;
 
 Decoder::Decoder(ISA* isa)
-    : data(0), fpscrLen(0), fpscrStride(0),
+    : InstDecoder(&data), data(0), fpscrLen(0), fpscrStride(0),
       decoderFlavor(isa->decoderFlavor())
 {
     reset();
@@ -144,15 +146,15 @@ void
 Decoder::consumeBytes(int numBytes)
 {
     offset += numBytes;
-    assert(offset <= sizeof(MachInst) || emi.decoderFault);
-    if (offset == sizeof(MachInst))
+    assert(offset <= sizeof(data) || emi.decoderFault);
+    if (offset == sizeof(data))
         outOfBytes = true;
 }
 
 void
-Decoder::moreBytes(const PCState &pc, Addr fetchPC, MachInst inst)
+Decoder::moreBytes(const PCState &pc, Addr fetchPC)
 {
-    data = letoh(inst);
+    data = letoh(data);
     offset = (fetchPC >= pc.instAddr()) ? 0 : pc.instAddr() - fetchPC;
     emi.thumb = pc.thumb();
     emi.aarch64 = pc.aarch64();
@@ -192,4 +194,5 @@ Decoder::decode(ArmISA::PCState &pc)
     return decode(this_emi, pc.instAddr());
 }
 
-}
+} // namespace ArmISA
+} // namespace gem5

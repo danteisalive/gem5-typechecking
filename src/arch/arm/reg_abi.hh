@@ -33,6 +33,9 @@
 #include "base/logging.hh"
 #include "sim/syscall_abi.hh"
 
+namespace gem5
+{
+
 namespace ArmISA
 {
 
@@ -48,7 +51,8 @@ struct RegABI64 : public GenericSyscallABI64
 
 } // namespace ArmISA
 
-namespace GuestABI
+GEM5_DEPRECATED_NAMESPACE(GuestABI, guest_abi);
+namespace guest_abi
 {
 
 template <typename ABI, typename Arg>
@@ -72,6 +76,7 @@ struct Argument<ABI, Arg,
     }
 };
 
-} // namespace GuestABI
+} // namespace guest_abi
+} // namespace gem5
 
-#endif // __ARCH_ARM_GEM5_OP_HH__
+#endif // __ARCH_ARM_REG_ABI_HH__

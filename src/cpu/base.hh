@@ -62,6 +62,9 @@
 #include "sim/system.hh"
 #include "debug/Mwait.hh"
 
+namespace gem5
+{
+
 class BaseCPU;
 struct BaseCPUParams;
 class CheckerCPU;
@@ -146,14 +149,15 @@ class BaseCPU : public ClockedObject
     const unsigned int _cacheLineSize;
 
     /** Global CPU statistics that are merged into the Root object. */
-    struct GlobalStats : public Stats::Group {
-        GlobalStats(::Stats::Group *parent);
+    struct GlobalStats : public statistics::Group
+    {
+        GlobalStats(statistics::Group *parent);
 
-        ::Stats::Value simInsts;
-        ::Stats::Value simOps;
+        statistics::Value simInsts;
+        statistics::Value simOps;
 
-        ::Stats::Formula hostInstRate;
-        ::Stats::Formula hostOpRate;
+        statistics::Formula hostInstRate;
+        statistics::Formula hostOpRate;
     };
 
     /**
@@ -171,17 +175,6 @@ class BaseCPU : public ClockedObject
      * @return a reference to the data port
      */
     virtual Port &getDataPort() = 0;
-
-    /**
-     * Returns a sendFunctional delegate for use with port proxies.
-     */
-    virtual PortProxy::SendFunctionalFunc
-    getSendFunctional()
-    {
-        auto port = dynamic_cast<RequestPort *>(&getDataPort());
-        assert(port);
-        return [port](PacketPtr pkt)->void { port->sendFunctional(pkt); };
-    }
 
     /**
      * Purely virtual method that returns a reference to the instruction
@@ -285,9 +278,6 @@ class BaseCPU : public ClockedObject
     /** Invalid or unknown Pid. Possible when operating system is not present
      *  or has not assigned a pid yet */
     static const uint32_t invldPid = std::numeric_limits<uint32_t>::max();
-
-    // Mask to align PCs to MachInst sized boundaries
-    static const Addr PCMask = ~((Addr)sizeof(TheISA::MachInst) - 1);
 
     /// Provide access to the tracer pointer
     Trace::InstTracer * getTracer() { return tracer; }
@@ -490,7 +480,7 @@ class BaseCPU : public ClockedObject
      * @param name Name of the probe point.
      * @return A unique_ptr to the new probe point.
      */
-    ProbePoints::PMUUPtr pmuProbePoint(const char *name);
+    probing::PMUUPtr pmuProbePoint(const char *name);
 
     /**
      * Instruction commit probe point.
@@ -500,22 +490,22 @@ class BaseCPU : public ClockedObject
      * instruction. However, CPU models committing bundles of
      * instructions may call notify once for the entire bundle.
      */
-    ProbePoints::PMUUPtr ppRetiredInsts;
-    ProbePoints::PMUUPtr ppRetiredInstsPC;
+    probing::PMUUPtr ppRetiredInsts;
+    probing::PMUUPtr ppRetiredInstsPC;
 
     /** Retired load instructions */
-    ProbePoints::PMUUPtr ppRetiredLoads;
+    probing::PMUUPtr ppRetiredLoads;
     /** Retired store instructions */
-    ProbePoints::PMUUPtr ppRetiredStores;
+    probing::PMUUPtr ppRetiredStores;
 
     /** Retired branches (any type) */
-    ProbePoints::PMUUPtr ppRetiredBranches;
+    probing::PMUUPtr ppRetiredBranches;
 
     /** CPU cycle counter even if any thread Context is suspended*/
-    ProbePoints::PMUUPtr ppAllCycles;
+    probing::PMUUPtr ppAllCycles;
 
     /** CPU cycle counter, only counts if any thread contexts is active **/
-    ProbePoints::PMUUPtr ppActiveCycles;
+    probing::PMUUPtr ppActiveCycles;
 
     /**
      * ProbePoint that signals transitions of threadContexts sets.
@@ -528,7 +518,8 @@ class BaseCPU : public ClockedObject
     ProbePointArg<bool> *ppSleeping;
     /** @} */
 
-    enum CPUState {
+    enum CPUState
+    {
         CPU_STATE_ON,
         CPU_STATE_SLEEP,
         CPU_STATE_WAKEUP
@@ -608,13 +599,13 @@ class BaseCPU : public ClockedObject
     }
 
   public:
-    struct BaseCPUStats : public Stats::Group
+    struct BaseCPUStats : public statistics::Group
     {
-        BaseCPUStats(Stats::Group *parent);
+        BaseCPUStats(statistics::Group *parent);
         // Number of CPU cycles simulated
-        Stats::Scalar numCycles;
-        Stats::Scalar numWorkItemsStarted;
-        Stats::Scalar numWorkItemsCompleted;
+        statistics::Scalar numCycles;
+        statistics::Scalar numWorkItemsStarted;
+        statistics::Scalar numWorkItemsCompleted;
     } baseStats;
 
   private:
@@ -630,8 +621,6 @@ class BaseCPU : public ClockedObject
         return &addressMonitor[tid];
     }
 
-    bool waitForRemoteGDB() const;
-
     Cycles syscallRetryLatency;
 
   // Enables CPU to enter power gating on a configurable cycle count
@@ -642,6 +631,8 @@ class BaseCPU : public ClockedObject
     const bool powerGatingOnIdle;
     EventFunctionWrapper enterPwrGatingEvent;
 };
+
+} // namespace gem5
 
 #endif // THE_ISA == NULL_ISA
 

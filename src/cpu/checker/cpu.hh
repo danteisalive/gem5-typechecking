@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2016-2018, 2020 ARM Limited
+ * Copyright (c) 2011, 2016-2018, 2020-2021 Arm Limited
  * Copyright (c) 2013 Advanced Micro Devices, Inc.
  * All rights reserved
  *
@@ -46,10 +46,9 @@
 #include <map>
 #include <queue>
 
-#include "arch/types.hh"
+#include "arch/pcstate.hh"
 #include "base/statistics.hh"
 #include "cpu/base.hh"
-#include "cpu/base_dyn_inst.hh"
 #include "cpu/exec_context.hh"
 #include "cpu/inst_res.hh"
 #include "cpu/pc_event.hh"
@@ -60,9 +59,9 @@
 #include "params/CheckerCPU.hh"
 #include "sim/eventq.hh"
 
-class BaseTLB;
-template <class>
-class BaseDynInst;
+namespace gem5
+{
+
 class ThreadContext;
 class Request;
 
@@ -87,6 +86,8 @@ class CheckerCPU : public BaseCPU, public ExecContext
   protected:
     /** id attached to all issued requests */
     RequestorID requestorId;
+
+    const RegIndex zeroReg;
 
   public:
     void init() override;
@@ -196,7 +197,7 @@ class CheckerCPU : public BaseCPU, public ExecContext
     readIntRegOperand(const StaticInst *si, int idx) override
     {
         const RegId& reg = si->srcRegIdx(idx);
-        assert(reg.isIntReg());
+        assert(reg.is(IntRegClass));
         return thread->readIntReg(reg.index());
     }
 
@@ -204,7 +205,7 @@ class CheckerCPU : public BaseCPU, public ExecContext
     readFloatRegOperandBits(const StaticInst *si, int idx) override
     {
         const RegId& reg = si->srcRegIdx(idx);
-        assert(reg.isFloatReg());
+        assert(reg.is(FloatRegClass));
         return thread->readFloatReg(reg.index());
     }
 
@@ -215,7 +216,7 @@ class CheckerCPU : public BaseCPU, public ExecContext
     readVecRegOperand(const StaticInst *si, int idx) const override
     {
         const RegId& reg = si->srcRegIdx(idx);
-        assert(reg.isVecReg());
+        assert(reg.is(VecRegClass));
         return thread->readVecReg(reg);
     }
 
@@ -226,82 +227,9 @@ class CheckerCPU : public BaseCPU, public ExecContext
     getWritableVecRegOperand(const StaticInst *si, int idx) override
     {
         const RegId& reg = si->destRegIdx(idx);
-        assert(reg.isVecReg());
+        assert(reg.is(VecRegClass));
         return thread->getWritableVecReg(reg);
     }
-
-    /** Vector Register Lane Interfaces. */
-    /** @{ */
-    /** Reads source vector 8bit operand. */
-    virtual ConstVecLane8
-    readVec8BitLaneOperand(const StaticInst *si, int idx) const override
-    {
-        const RegId& reg = si->destRegIdx(idx);
-        assert(reg.isVecReg());
-        return thread->readVec8BitLaneReg(reg);
-    }
-
-    /** Reads source vector 16bit operand. */
-    virtual ConstVecLane16
-    readVec16BitLaneOperand(const StaticInst *si, int idx) const override
-    {
-        const RegId& reg = si->destRegIdx(idx);
-        assert(reg.isVecReg());
-        return thread->readVec16BitLaneReg(reg);
-    }
-
-    /** Reads source vector 32bit operand. */
-    virtual ConstVecLane32
-    readVec32BitLaneOperand(const StaticInst *si, int idx) const override
-    {
-        const RegId& reg = si->destRegIdx(idx);
-        assert(reg.isVecReg());
-        return thread->readVec32BitLaneReg(reg);
-    }
-
-    /** Reads source vector 64bit operand. */
-    virtual ConstVecLane64
-    readVec64BitLaneOperand(const StaticInst *si, int idx) const override
-    {
-        const RegId& reg = si->destRegIdx(idx);
-        assert(reg.isVecReg());
-        return thread->readVec64BitLaneReg(reg);
-    }
-
-    /** Write a lane of the destination vector operand. */
-    template <typename LD>
-    void
-    setVecLaneOperandT(const StaticInst *si, int idx, const LD& val)
-    {
-        const RegId& reg = si->destRegIdx(idx);
-        assert(reg.isVecReg());
-        return thread->setVecLane(reg, val);
-    }
-    virtual void
-    setVecLaneOperand(const StaticInst *si, int idx,
-            const LaneData<LaneSize::Byte>& val) override
-    {
-        setVecLaneOperandT(si, idx, val);
-    }
-    virtual void
-    setVecLaneOperand(const StaticInst *si, int idx,
-            const LaneData<LaneSize::TwoByte>& val) override
-    {
-        setVecLaneOperandT(si, idx, val);
-    }
-    virtual void
-    setVecLaneOperand(const StaticInst *si, int idx,
-            const LaneData<LaneSize::FourByte>& val) override
-    {
-        setVecLaneOperandT(si, idx, val);
-    }
-    virtual void
-    setVecLaneOperand(const StaticInst *si, int idx,
-            const LaneData<LaneSize::EightByte>& val) override
-    {
-        setVecLaneOperandT(si, idx, val);
-    }
-    /** @} */
 
     TheISA::VecElem
     readVecElemOperand(const StaticInst *si, int idx) const override
@@ -314,7 +242,7 @@ class CheckerCPU : public BaseCPU, public ExecContext
     readVecPredRegOperand(const StaticInst *si, int idx) const override
     {
         const RegId& reg = si->srcRegIdx(idx);
-        assert(reg.isVecPredReg());
+        assert(reg.is(VecPredRegClass));
         return thread->readVecPredReg(reg);
     }
 
@@ -322,7 +250,7 @@ class CheckerCPU : public BaseCPU, public ExecContext
     getWritableVecPredRegOperand(const StaticInst *si, int idx) override
     {
         const RegId& reg = si->destRegIdx(idx);
-        assert(reg.isVecPredReg());
+        assert(reg.is(VecPredRegClass));
         return thread->getWritableVecPredReg(reg);
     }
 
@@ -330,7 +258,7 @@ class CheckerCPU : public BaseCPU, public ExecContext
     readCCRegOperand(const StaticInst *si, int idx) override
     {
         const RegId& reg = si->srcRegIdx(idx);
-        assert(reg.isCCReg());
+        assert(reg.is(CCRegClass));
         return thread->readCCReg(reg.index());
     }
 
@@ -370,7 +298,7 @@ class CheckerCPU : public BaseCPU, public ExecContext
     setIntRegOperand(const StaticInst *si, int idx, RegVal val) override
     {
         const RegId& reg = si->destRegIdx(idx);
-        assert(reg.isIntReg());
+        assert(reg.is(IntRegClass));
         thread->setIntReg(reg.index(), val);
         setScalarResult(val);
     }
@@ -379,7 +307,7 @@ class CheckerCPU : public BaseCPU, public ExecContext
     setFloatRegOperandBits(const StaticInst *si, int idx, RegVal val) override
     {
         const RegId& reg = si->destRegIdx(idx);
-        assert(reg.isFloatReg());
+        assert(reg.is(FloatRegClass));
         thread->setFloatReg(reg.index(), val);
         setScalarResult(val);
     }
@@ -388,7 +316,7 @@ class CheckerCPU : public BaseCPU, public ExecContext
     setCCRegOperand(const StaticInst *si, int idx, RegVal val) override
     {
         const RegId& reg = si->destRegIdx(idx);
-        assert(reg.isCCReg());
+        assert(reg.is(CCRegClass));
         thread->setCCReg(reg.index(), val);
         setScalarResult((uint64_t)val);
     }
@@ -398,7 +326,7 @@ class CheckerCPU : public BaseCPU, public ExecContext
                      const TheISA::VecRegContainer& val) override
     {
         const RegId& reg = si->destRegIdx(idx);
-        assert(reg.isVecReg());
+        assert(reg.is(VecRegClass));
         thread->setVecReg(reg, val);
         setVecResult(val);
     }
@@ -408,7 +336,7 @@ class CheckerCPU : public BaseCPU, public ExecContext
                       const TheISA::VecElem val) override
     {
         const RegId& reg = si->destRegIdx(idx);
-        assert(reg.isVecElem());
+        assert(reg.is(VecElemClass));
         thread->setVecElem(reg, val);
         setVecElemResult(val);
     }
@@ -417,7 +345,7 @@ class CheckerCPU : public BaseCPU, public ExecContext
                               const TheISA::VecPredRegContainer& val) override
     {
         const RegId& reg = si->destRegIdx(idx);
-        assert(reg.isVecPredReg());
+        assert(reg.is(VecPredRegClass));
         thread->setVecPredReg(reg, val);
         setVecPredResult(val);
     }
@@ -466,15 +394,14 @@ class CheckerCPU : public BaseCPU, public ExecContext
     bool
     inHtmTransactionalState() const override
     {
-        panic("not yet supported!");
-        return false;
+        return (getHtmTransactionalDepth() > 0);
     }
 
     uint64_t
     getHtmTransactionalDepth() const override
     {
-        panic("not yet supported!");
-        return 0;
+        assert(thread->htmTransactionStarts >= thread->htmTransactionStops);
+        return (thread->htmTransactionStarts - thread->htmTransactionStops);
     }
 
     TheISA::PCState pcState() const override { return thread->pcState(); }
@@ -524,7 +451,7 @@ class CheckerCPU : public BaseCPU, public ExecContext
     readMiscRegOperand(const StaticInst *si, int idx) override
     {
         const RegId& reg = si->srcRegIdx(idx);
-        assert(reg.isMiscReg());
+        assert(reg.is(MiscRegClass));
         return thread->readMiscReg(reg.index());
     }
 
@@ -532,7 +459,7 @@ class CheckerCPU : public BaseCPU, public ExecContext
     setMiscRegOperand(const StaticInst *si, int idx, RegVal val) override
     {
         const RegId& reg = si->destRegIdx(idx);
-        assert(reg.isMiscReg());
+        assert(reg.is(MiscRegClass));
         return this->setMiscReg(reg.index(), val);
     }
 
@@ -646,12 +573,9 @@ class CheckerCPU : public BaseCPU, public ExecContext
  * template instantiations of the Checker must be placed at the bottom
  * of checker/cpu.cc.
  */
-template <class Impl>
+template <class DynInstPtr>
 class Checker : public CheckerCPU
 {
-  private:
-    typedef typename Impl::DynInstPtr DynInstPtr;
-
   public:
     Checker(const Params &p)
         : CheckerCPU(p), updateThisCycle(false), unverifiedInst(NULL)
@@ -692,5 +616,7 @@ class Checker : public CheckerCPU
     typedef typename std::list<DynInstPtr>::iterator InstListIt;
     void dumpInsts();
 };
+
+} // namespace gem5
 
 #endif // __CPU_CHECKER_CPU_HH__

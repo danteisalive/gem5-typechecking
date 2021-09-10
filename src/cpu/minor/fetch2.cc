@@ -40,16 +40,20 @@
 #include <string>
 
 #include "arch/decoder.hh"
-#include "arch/utility.hh"
 #include "base/logging.hh"
 #include "base/trace.hh"
 #include "cpu/minor/pipeline.hh"
+#include "cpu/null_static_inst.hh"
 #include "cpu/pred/bpred_unit.hh"
 #include "debug/Branch.hh"
 #include "debug/Fetch.hh"
 #include "debug/MinorTrace.hh"
 
-namespace Minor
+namespace gem5
+{
+
+GEM5_DEPRECATED_NAMESPACE(Minor, minor);
+namespace minor
 {
 
 Fetch2::Fetch2(const std::string &name,
@@ -329,7 +333,7 @@ Fetch2::evaluate()
                 /* Set the inputIndex to be the MachInst-aligned offset
                  *  from lineBaseAddr of the new PC value */
                 fetch_info.inputIndex =
-                    (line_in->pc.instAddr() & BaseCPU::PCMask) -
+                    (line_in->pc.instAddr() & decoder->pcMask()) -
                     line_in->lineBaseAddr;
                 DPRINTF(Fetch, "Setting new PC value: %s inputIndex: 0x%x"
                     " lineBaseAddr: 0x%x lineWidth: 0x%x\n",
@@ -356,8 +360,7 @@ Fetch2::evaluate()
 
                 /* Make a new instruction and pick up the line, stream,
                  *  prediction, thread ids from the incoming line */
-                dyn_inst = new MinorDynInst(
-                        StaticInst::nullStaticInstPtr, line_in->id);
+                dyn_inst = new MinorDynInst(nullStaticInstPtr, line_in->id);
 
                 /* Fetch and prediction sequence numbers originate here */
                 dyn_inst->id.fetchSeqNum = fetch_info.fetchSeqNum;
@@ -377,15 +380,13 @@ Fetch2::evaluate()
             } else {
                 uint8_t *line = line_in->line;
 
-                /* The instruction is wholly in the line, can just
-                 *  assign */
-                auto inst_word = *reinterpret_cast<TheISA::MachInst *>
-                                  (line + fetch_info.inputIndex);
+                /* The instruction is wholly in the line, can just copy. */
+                memcpy(decoder->moreBytesPtr(), line + fetch_info.inputIndex,
+                        decoder->moreBytesSize());
 
                 if (!decoder->instReady()) {
                     decoder->moreBytes(fetch_info.pc,
-                        line_in->lineBaseAddr + fetch_info.inputIndex,
-                        inst_word);
+                        line_in->lineBaseAddr + fetch_info.inputIndex);
                     DPRINTF(Fetch, "Offering MachInst to decoder addr: 0x%x\n",
                             line_in->lineBaseAddr + fetch_info.inputIndex);
                 }
@@ -455,7 +456,7 @@ Fetch2::evaluate()
 #endif
 
                     /* Advance PC for the next instruction */
-                    TheISA::advancePC(fetch_info.pc, decoded_inst);
+                    decoded_inst->advancePC(fetch_info.pc);
 
                     /* Predict any branches and issue a branch if
                      *  necessary */
@@ -467,7 +468,7 @@ Fetch2::evaluate()
                 /* Step on the pointer into the line if there's no
                  *  complete instruction waiting */
                 if (decoder->needMoreBytes()) {
-                    fetch_info.inputIndex += sizeof(TheISA::MachInst);
+                    fetch_info.inputIndex += decoder->moreBytesSize();
 
                 DPRINTF(Fetch, "Updated inputIndex value PC: %s"
                     " inputIndex: 0x%x lineBaseAddr: 0x%x lineWidth: 0x%x\n",
@@ -490,10 +491,11 @@ Fetch2::evaluate()
 
                 /* Output MinorTrace instruction info for
                  *  pre-microop decomposition macroops */
-                if (DTRACE(MinorTrace) && !dyn_inst->isFault() &&
+                if (debug::MinorTrace && !dyn_inst->isFault() &&
                     dyn_inst->staticInst->isMacroop())
                 {
-                    dyn_inst->minorTraceInst(*this);
+                    dyn_inst->minorTraceInst(*this,
+                            cpu.threads[0]->getIsaPtr()->regClasses());
                 }
             }
 
@@ -570,13 +572,13 @@ Fetch2::getScheduledThread()
     std::vector<ThreadID> priority_list;
 
     switch (cpu.threadPolicy) {
-      case Enums::SingleThreaded:
+      case enums::SingleThreaded:
         priority_list.push_back(0);
         break;
-      case Enums::RoundRobin:
+      case enums::RoundRobin:
         priority_list = cpu.roundRobinPriority(threadPriority);
         break;
-      case Enums::Random:
+      case enums::Random:
         priority_list = cpu.randomPriority();
         break;
       default:
@@ -606,32 +608,32 @@ Fetch2::isDrained()
 }
 
 Fetch2::Fetch2Stats::Fetch2Stats(MinorCPU *cpu)
-      : Stats::Group(cpu, "fetch2"),
-      ADD_STAT(intInstructions, UNIT_COUNT,
+      : statistics::Group(cpu, "fetch2"),
+      ADD_STAT(intInstructions, statistics::units::Count::get(),
                "Number of integer instructions successfully decoded"),
-      ADD_STAT(fpInstructions, UNIT_COUNT,
+      ADD_STAT(fpInstructions, statistics::units::Count::get(),
                "Number of floating point instructions successfully decoded"),
-      ADD_STAT(vecInstructions, UNIT_COUNT,
+      ADD_STAT(vecInstructions, statistics::units::Count::get(),
                "Number of SIMD instructions successfully decoded"),
-      ADD_STAT(loadInstructions, UNIT_COUNT,
+      ADD_STAT(loadInstructions, statistics::units::Count::get(),
                "Number of memory load instructions successfully decoded"),
-      ADD_STAT(storeInstructions, UNIT_COUNT,
+      ADD_STAT(storeInstructions, statistics::units::Count::get(),
                "Number of memory store instructions successfully decoded"),
-      ADD_STAT(amoInstructions, UNIT_COUNT,
+      ADD_STAT(amoInstructions, statistics::units::Count::get(),
                "Number of memory atomic instructions successfully decoded")
 {
         intInstructions
-            .flags(Stats::total);
+            .flags(statistics::total);
         fpInstructions
-            .flags(Stats::total);
+            .flags(statistics::total);
         vecInstructions
-            .flags(Stats::total);
+            .flags(statistics::total);
         loadInstructions
-            .flags(Stats::total);
+            .flags(statistics::total);
         storeInstructions
-            .flags(Stats::total);
+            .flags(statistics::total);
         amoInstructions
-            .flags(Stats::total);
+            .flags(statistics::total);
 }
 
 void
@@ -644,9 +646,11 @@ Fetch2::minorTrace() const
     else
         (*out.inputWire).reportData(data);
 
-    MINORTRACE("inputIndex=%d havePC=%d predictionSeqNum=%d insts=%s\n",
-        fetchInfo[0].inputIndex, fetchInfo[0].havePC, fetchInfo[0].predictionSeqNum, data.str());
+    minor::minorTrace("inputIndex=%d havePC=%d predictionSeqNum=%d insts=%s\n",
+        fetchInfo[0].inputIndex, fetchInfo[0].havePC,
+        fetchInfo[0].predictionSeqNum, data.str());
     inputBuffer[0].minorTrace();
 }
 
-}
+} // namespace minor
+} // namespace gem5

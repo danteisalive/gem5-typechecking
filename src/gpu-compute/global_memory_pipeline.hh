@@ -53,6 +53,9 @@
  * returned from the memory sub-system.
  */
 
+namespace gem5
+{
+
 class ComputeUnit;
 
 class GlobalMemPipeline
@@ -143,15 +146,17 @@ class GlobalMemPipeline
     std::queue<GPUDynInstPtr> gmIssuedRequests;
 
   protected:
-    struct GlobalMemPipelineStats : public Stats::Group
+    struct GlobalMemPipelineStats : public statistics::Group
     {
-        GlobalMemPipelineStats(Stats::Group *parent);
+        GlobalMemPipelineStats(statistics::Group *parent);
 
         // number of cycles of delaying the update of a VGPR that is the
         // target of a load instruction (or the load component of an atomic)
         // The delay is due to VRF bank conflicts
-        Stats::Scalar loadVrfBankConflictCycles;
+        statistics::Scalar loadVrfBankConflictCycles;
     } stats;
 };
+
+} // namespace gem5
 
 #endif // __GLOBAL_MEMORY_PIPELINE_HH__

@@ -29,13 +29,16 @@
 
 #include "arch/x86/linux/linux.hh"
 #include "arch/x86/process.hh"
-#include "arch/x86/registers.hh"
+#include "arch/x86/regs/misc.hh"
 #include "base/trace.hh"
 #include "cpu/thread_context.hh"
 #include "kern/linux/linux.hh"
 #include "sim/process.hh"
 #include "sim/syscall_desc.hh"
 #include "sim/syscall_emul.hh"
+
+namespace gem5
+{
 
 namespace X86ISA
 {
@@ -170,3 +173,4 @@ setThreadArea32Func(SyscallDesc *desc, ThreadContext *tc,
 }
 
 } // namespace X86ISA
+} // namespace gem5

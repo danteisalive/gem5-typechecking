@@ -48,6 +48,9 @@
 #include "base/compiler.hh"
 #include "base/cprintf.hh"
 
+namespace gem5
+{
+
 class Logger
 {
   public:
@@ -61,7 +64,8 @@ class Logger
     static Logger &getInfo();
     static Logger &getHack();
 
-    enum LogLevel {
+    enum LogLevel
+    {
         PANIC, FATAL, WARN, INFO, HACK,
         NUM_LOG_LEVELS,
     };
@@ -90,24 +94,20 @@ class Logger
 
     virtual ~Logger() {};
 
-    void
-    print(const Loc &loc, const std::string &str)
-    {
-        std::stringstream ss;
-        ss << prefix << str;
-        if (str.length() && str.back() != '\n' && str.back() != '\r')
-            ss << std::endl;
-        if (!enabled)
-            return;
-        log(loc, ss.str());
-    }
-
     template<typename ...Args> void
     print(const Loc &loc, const char *format, const Args &...args)
     {
         std::stringstream ss;
         ccprintf(ss, format, args...);
-        print(loc, ss.str());
+        const std::string str = ss.str();
+
+        std::stringstream ss_formatted;
+        ss_formatted << prefix << str;
+        if (str.length() && str.back() != '\n' && str.back() != '\r')
+            ss_formatted << std::endl;
+        if (!enabled)
+            return;
+        log(loc, ss_formatted.str());
     }
 
     template<typename ...Args> void
@@ -126,7 +126,13 @@ class Logger
   protected:
     bool enabled;
 
-    virtual void log(const Loc &loc, std::string s) = 0;
+    /** Generates the log message. By default it is sent to cerr. */
+    virtual void
+    log(const Loc &loc, std::string s)
+    {
+        std::cerr << loc.file << ":" << loc.line << ": " << s;
+    }
+
     virtual void exit() { /* Fall through to the abort in exit_helper. */ }
 
     const char *prefix;
@@ -134,7 +140,7 @@ class Logger
 
 
 #define base_message(logger, ...) \
-    logger.print(::Logger::Loc(__FILE__, __LINE__), __VA_ARGS__)
+    logger.print(::gem5::Logger::Loc(__FILE__, __LINE__), __VA_ARGS__)
 
 /*
  * Only print the message the first time this expression is
@@ -168,7 +174,7 @@ class Logger
  *
  * @ingroup api_logger
  */
-#define panic(...) exit_message(::Logger::getPanic(), __VA_ARGS__)
+#define panic(...) exit_message(::gem5::Logger::getPanic(), __VA_ARGS__)
 
 /**
  * This implements a cprintf based fatal() function.  fatal() should
@@ -180,7 +186,7 @@ class Logger
  *
  * @ingroup api_logger
  */
-#define fatal(...) exit_message(::Logger::getFatal(), __VA_ARGS__)
+#define fatal(...) exit_message(::gem5::Logger::getFatal(), __VA_ARGS__)
 
 /**
  * Conditional panic macro that checks the supplied condition and only panics
@@ -196,9 +202,9 @@ class Logger
  */
 #define panic_if(cond, ...)                                  \
     do {                                                     \
-        if (M5_UNLIKELY(cond)) {                             \
+        if (GEM5_UNLIKELY(cond)) {                             \
             panic("panic condition " # cond " occurred: %s", \
-                  csprintf(__VA_ARGS__));                    \
+                  ::gem5::csprintf(__VA_ARGS__));                    \
         }                                                    \
     } while (0)
 
@@ -218,9 +224,9 @@ class Logger
  */
 #define fatal_if(cond, ...)                                     \
     do {                                                        \
-        if (M5_UNLIKELY(cond)) {                                \
+        if (GEM5_UNLIKELY(cond)) {                                \
             fatal("fatal condition " # cond " occurred: %s",    \
-                  csprintf(__VA_ARGS__));                       \
+                  ::gem5::csprintf(__VA_ARGS__));                       \
         }                                                       \
     } while (0)
 
@@ -236,13 +242,16 @@ class Logger
  * @ingroup api_logger
  * @{
  */
-#define warn(...) base_message(::Logger::getWarn(), __VA_ARGS__)
-#define inform(...) base_message(::Logger::getInfo(), __VA_ARGS__)
-#define hack(...) base_message(::Logger::getHack(), __VA_ARGS__)
+#define warn(...) base_message(::gem5::Logger::getWarn(), __VA_ARGS__)
+#define inform(...) base_message(::gem5::Logger::getInfo(), __VA_ARGS__)
+#define hack(...) base_message(::gem5::Logger::getHack(), __VA_ARGS__)
 
-#define warn_once(...) base_message_once(::Logger::getWarn(), __VA_ARGS__)
-#define inform_once(...) base_message_once(::Logger::getInfo(), __VA_ARGS__)
-#define hack_once(...) base_message_once(::Logger::getHack(), __VA_ARGS__)
+#define warn_once(...) \
+    base_message_once(::gem5::Logger::getWarn(), __VA_ARGS__)
+#define inform_once(...) \
+    base_message_once(::gem5::Logger::getInfo(), __VA_ARGS__)
+#define hack_once(...) \
+    base_message_once(::gem5::Logger::getHack(), __VA_ARGS__)
 /** @} */ // end of api_logger
 
 /**
@@ -262,13 +271,13 @@ class Logger
  */
 #define warn_if(cond, ...) \
     do { \
-        if (M5_UNLIKELY(cond)) \
+        if (GEM5_UNLIKELY(cond)) \
             warn(__VA_ARGS__); \
     } while (0)
 
 #define warn_if_once(cond, ...) \
     do { \
-        if (M5_UNLIKELY(cond)) \
+        if (GEM5_UNLIKELY(cond)) \
             warn_once(__VA_ARGS__); \
     } while (0)
 /** @} */ // end of api_logger
@@ -291,9 +300,13 @@ class Logger
 #else //!NDEBUG
 #define chatty_assert(cond, ...)                                        \
     do {                                                                \
-        if (M5_UNLIKELY(!(cond)))                                       \
-            panic("assert(" # cond ") failed: %s", csprintf(__VA_ARGS__)); \
+        if (GEM5_UNLIKELY(!(cond)))                                       \
+            panic("assert(" # cond ") failed: %s", \
+                ::gem5::csprintf(__VA_ARGS__)); \
     } while (0)
 #endif // NDEBUG
 /** @} */ // end of api_logger
+
+} // namespace gem5
+
 #endif // __BASE_LOGGING_HH__

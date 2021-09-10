@@ -30,19 +30,31 @@
 
 #include <vector>
 
-#include "arch/sparc/miscregs.hh"
+#include "arch/sparc/regs/int.hh"
+#include "arch/sparc/regs/misc.hh"
+#include "arch/sparc/remote_gdb.hh"
 #include "base/loader/object_file.hh"
 #include "cpu/thread_context.hh"
 #include "sim/se_workload.hh"
 #include "sim/syscall_abi.hh"
 
+namespace gem5
+{
+
 namespace SparcISA
 {
 
-class SEWorkload : public ::SEWorkload
+class SEWorkload : public gem5::SEWorkload
 {
   public:
-    using ::SEWorkload::SEWorkload;
+    using gem5::SEWorkload::SEWorkload;
+
+    void
+    setSystem(System *sys) override
+    {
+        gem5::SEWorkload::setSystem(sys);
+        gdb = BaseRemoteGDB::build<RemoteGDB>(system);
+    }
 
     virtual void handleTrap(ThreadContext *tc, int trapNum);
     virtual void flushWindows(ThreadContext *tc);
@@ -65,7 +77,8 @@ class SEWorkload : public ::SEWorkload
 
 } // namespace SparcISA
 
-namespace GuestABI
+GEM5_DEPRECATED_NAMESPACE(GuestABI, guest_abi);
+namespace guest_abi
 {
 
 template <typename ABI>
@@ -121,6 +134,7 @@ struct Argument<SparcISA::SEWorkload::SyscallABI32, Arg,
     }
 };
 
-} // namespace GuestABI
+} // namespace guest_abi
+} // namespace gem5
 
 #endif // __ARCH_SPARC_SE_WORKLOAD_HH__

@@ -28,12 +28,16 @@
 #include "arch/arm/fastmodel/CortexA76/cortex_a76.hh"
 
 #include "arch/arm/fastmodel/iris/cpu.hh"
+#include "arch/arm/regs/misc.hh"
 #include "base/logging.hh"
 #include "dev/arm/base_gic.hh"
-#include "sim/core.hh"
 #include "systemc/tlm_bridge/gem5_to_tlm.hh"
 
-namespace FastModel
+namespace gem5
+{
+
+GEM5_DEPRECATED_NAMESPACE(FastModel, fastmodel);
+namespace fastmodel
 {
 
 void
@@ -196,4 +200,5 @@ CortexA76Cluster::getPort(const std::string &if_name, PortID idx)
     }
 }
 
-} // namespace FastModel
+} // namespace fastmodel
+} // namespace gem5

@@ -42,6 +42,9 @@
 
 #include "cpu/exec_context.hh"
 
+namespace gem5
+{
+
 using namespace ArmISA;
 
 DecoderFaultInst::DecoderFaultInst(ExtMachInst _machInst)
@@ -100,7 +103,7 @@ DecoderFaultInst::faultName() const
 
 std::string
 DecoderFaultInst::generateDisassembly(
-        Addr pc, const Loader::SymbolTable *symtab) const
+        Addr pc, const loader::SymbolTable *symtab) const
 {
     return csprintf("gem5fault %s", faultName());
 }
@@ -135,7 +138,7 @@ FailUnimplemented::execute(ExecContext *xc, Trace::InstRecord *traceData) const
 
 std::string
 FailUnimplemented::generateDisassembly(
-        Addr pc, const Loader::SymbolTable *symtab) const
+        Addr pc, const loader::SymbolTable *symtab) const
 {
     return csprintf("%-10s (unimplemented)",
                     fullMnemonic.size() ? fullMnemonic.c_str() : mnemonic);
@@ -177,7 +180,7 @@ WarnUnimplemented::execute(ExecContext *xc, Trace::InstRecord *traceData) const
 
 std::string
 WarnUnimplemented::generateDisassembly(
-        Addr pc, const Loader::SymbolTable *symtab) const
+        Addr pc, const loader::SymbolTable *symtab) const
 {
     return csprintf("%-10s (unimplemented)",
                     fullMnemonic.size() ? fullMnemonic.c_str() : mnemonic);
@@ -212,3 +215,5 @@ DebugStep::execute(ExecContext *xc, Trace::InstRecord *traceData) const
                                                pc_state.stepped());
 
 }
+
+} // namespace gem5

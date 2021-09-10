@@ -42,11 +42,15 @@
 
 #include <algorithm>
 
+#include "base/compiler.hh"
 #include "base/intmath.hh"
 #include "debug/GIC.hh"
 #include "dev/arm/gic_v3.hh"
 #include "dev/arm/gic_v3_cpu_interface.hh"
 #include "dev/arm/gic_v3_redistributor.hh"
+
+namespace gem5
+{
 
 const AddrRange Gicv3Distributor::GICD_IGROUPR   (0x0080, 0x0100);
 const AddrRange Gicv3Distributor::GICD_ISENABLER (0x0100, 0x0180);
@@ -1155,7 +1159,7 @@ Gicv3Distributor::getIntGroup(int int_id) const
         }
     }
 
-    M5_UNREACHABLE;
+    GEM5_UNREACHABLE;
 }
 
 void
@@ -1212,3 +1216,5 @@ Gicv3Distributor::unserialize(CheckpointIn & cp)
     UNSERIALIZE_CONTAINER(irqNsacr);
     UNSERIALIZE_CONTAINER(irqAffinityRouting);
 }
+
+} // namespace gem5

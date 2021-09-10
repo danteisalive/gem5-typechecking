@@ -53,6 +53,9 @@
 #include "sim/process.hh"
 #include "sim/syscall_return.hh"
 
+namespace gem5
+{
+
 class SyscallDesc;
 
 SyscallReturn unimplementedFunc(SyscallDesc *desc, ThreadContext *tc);
@@ -63,7 +66,8 @@ SyscallReturn unimplementedFunc(SyscallDesc *desc, ThreadContext *tc);
  * bound to the ISAs in the architecture specific code
  * (i.e. arch/X86/linux/process.cc).
  */
-class SyscallDesc {
+class SyscallDesc
+{
   public:
     /**
      * Interface for invoking the system call funcion pointer. Note that
@@ -104,7 +108,7 @@ class SyscallDesc {
 /*
  * This SyscallDesc subclass template adapts a given syscall implementation so
  * that some arguments can come from the simulator (desc, num and tc) while the
- * rest can come from the guest using the GuestABI mechanism.
+ * rest can come from the guest using the guest_abi mechanism.
  */
 template <typename ABI>
 class SyscallDescABI : public SyscallDesc
@@ -172,7 +176,7 @@ class SyscallDescABI : public SyscallDesc
     void
     returnInto(ThreadContext *tc, const SyscallReturn &ret) override
     {
-        GuestABI::Result<ABI, SyscallReturn>::store(tc, ret);
+        guest_abi::Result<ABI, SyscallReturn>::store(tc, ret);
     }
 };
 
@@ -204,5 +208,7 @@ class SyscallDescTable
         return &it->second;
     }
 };
+
+} // namespace gem5
 
 #endif // __SIM_SYSCALL_DESC_HH__

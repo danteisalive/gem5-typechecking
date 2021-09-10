@@ -50,6 +50,9 @@
  * loads and stores that have returned from the LDS.
  */
 
+namespace gem5
+{
+
 class ComputeUnit;
 class Wavefront;
 
@@ -97,12 +100,14 @@ class LocalMemPipeline
     std::queue<GPUDynInstPtr> lmReturnedRequests;
 
   protected:
-    struct LocalMemPipelineStats : public Stats::Group
+    struct LocalMemPipelineStats : public statistics::Group
     {
-        LocalMemPipelineStats(Stats::Group *parent);
+        LocalMemPipelineStats(statistics::Group *parent);
 
-        Stats::Scalar loadVrfBankConflictCycles;
+        statistics::Scalar loadVrfBankConflictCycles;
     } stats;
 };
+
+} // namespace gem5
 
 #endif // __LOCAL_MEMORY_PIPELINE_HH__

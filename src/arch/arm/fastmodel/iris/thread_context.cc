@@ -41,6 +41,7 @@
 
 #include <utility>
 
+#include "arch/arm/fastmodel/iris/cpu.hh"
 #include "arch/arm/system.hh"
 #include "arch/arm/utility.hh"
 #include "iris/detail/IrisCppAdapter.h"
@@ -48,6 +49,9 @@
 #include "mem/se_translating_port_proxy.hh"
 #include "mem/translating_port_proxy.hh"
 #include "sim/pseudo_inst.hh"
+
+namespace gem5
+{
 
 namespace Iris
 {
@@ -304,7 +308,7 @@ ThreadContext::semihostingEvent(
 }
 
 ThreadContext::ThreadContext(
-        BaseCPU *cpu, int id, System *system, ::BaseMMU *mmu,
+        gem5::BaseCPU *cpu, int id, System *system, gem5::BaseMMU *mmu,
         BaseISA *isa, iris::IrisConnectionInterface *iris_if,
         const std::string &iris_path) :
     _cpu(cpu), _threadId(id), _system(system), _mmu(mmu), _isa(isa),
@@ -474,18 +478,23 @@ ThreadContext::getCurrentInstCount()
 }
 
 void
-ThreadContext::initMemProxies(::ThreadContext *tc)
+ThreadContext::initMemProxies(gem5::ThreadContext *tc)
 {
+    assert(!virtProxy);
     if (FullSystem) {
-        assert(!physProxy && !virtProxy);
-        physProxy.reset(new PortProxy(_cpu->getSendFunctional(),
-                                      _cpu->cacheLineSize()));
         virtProxy.reset(new TranslatingPortProxy(tc));
     } else {
-        assert(!virtProxy);
         virtProxy.reset(new SETranslatingPortProxy(this,
                         SETranslatingPortProxy::NextPage));
     }
+}
+
+void
+ThreadContext::sendFunctional(PacketPtr pkt)
+{
+    auto *iris_cpu = dynamic_cast<Iris::BaseCPU *>(getCpuPtr());
+    assert(iris_cpu);
+    iris_cpu->evs_base_cpu->sendFunc(pkt);
 }
 
 ThreadContext::Status
@@ -664,7 +673,7 @@ ThreadContext::readVecReg(const RegId &reg_id) const
     call().resource_read(_instId, result, vecRegIds.at(idx));
     size_t data_size = result.data.size() * (sizeof(*result.data.data()));
     size_t size = std::min(data_size, reg.size());
-    memcpy(reg.raw_ptr<void>(), (void *)result.data.data(), size);
+    memcpy(reg.as<uint8_t>(), (void *)result.data.data(), size);
 
     return reg;
 }
@@ -693,13 +702,13 @@ ThreadContext::readVecPredReg(const RegId &reg_id) const
     size_t num_bits = reg.NUM_BITS;
     uint8_t *bytes = (uint8_t *)result.data.data();
     while (num_bits > 8) {
-        reg.set_bits(offset, 8, *bytes);
+        reg.setBits(offset, 8, *bytes);
         offset += 8;
         num_bits -= 8;
         bytes++;
     }
     if (num_bits)
-        reg.set_bits(offset, num_bits, *bytes);
+        reg.setBits(offset, num_bits, *bytes);
 
     return reg;
 }
@@ -711,3 +720,4 @@ ThreadContext::readVecPredRegFlat(RegIndex idx) const
 }
 
 } // namespace Iris
+} // namespace gem5

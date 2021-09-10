@@ -34,12 +34,15 @@
 
 #include "arch/generic/interrupts.hh"
 #include "arch/riscv/faults.hh"
-#include "arch/riscv/registers.hh"
+#include "arch/riscv/regs/misc.hh"
 #include "base/logging.hh"
 #include "cpu/thread_context.hh"
 #include "debug/Interrupt.hh"
 #include "params/RiscvInterrupts.hh"
 #include "sim/sim_object.hh"
+
+namespace gem5
+{
 
 class BaseCPU;
 class ThreadContext;
@@ -174,5 +177,6 @@ class Interrupts : public BaseInterrupts
 };
 
 } // namespace RiscvISA
+} // namespace gem5
 
 #endif // __ARCH_RISCV_INTERRUPT_HH__

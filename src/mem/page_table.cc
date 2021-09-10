@@ -41,6 +41,9 @@
 #include "sim/faults.hh"
 #include "sim/serialize.hh"
 
+namespace gem5
+{
+
 void
 EmulationPageTable::map(Addr vaddr, Addr paddr, int64_t size, uint64_t flags)
 {
@@ -78,7 +81,7 @@ EmulationPageTable::remap(Addr vaddr, int64_t size, Addr new_vaddr)
             new_vaddr, size);
 
     while (size > 0) {
-        M5_VAR_USED auto new_it = pTable.find(new_vaddr);
+        GEM5_VAR_USED auto new_it = pTable.find(new_vaddr);
         auto old_it = pTable.find(vaddr);
         assert(old_it != pTable.end() && new_it == pTable.end());
 
@@ -203,3 +206,14 @@ EmulationPageTable::unserialize(CheckpointIn &cp)
     }
 }
 
+const std::string
+EmulationPageTable::externalize() const
+{
+    std::stringstream ss;
+    for (PTable::const_iterator it=pTable.begin(); it != pTable.end(); ++it) {
+        ss << std::hex << it->first << ":" << it->second.paddr << ";";
+    }
+    return ss.str();
+}
+
+} // namespace gem5

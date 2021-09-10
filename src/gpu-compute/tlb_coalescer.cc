@@ -35,10 +35,13 @@
 
 #include <cstring>
 
-#include "arch/x86/isa_traits.hh"
+#include "arch/x86/page_size.hh"
 #include "base/logging.hh"
 #include "debug/GPUTLB.hh"
 #include "sim/process.hh"
+
+namespace gem5
+{
 
 TLBCoalescer::TLBCoalescer(const Params &p)
     : ClockedObject(p),
@@ -118,8 +121,8 @@ TLBCoalescer::canCoalesce(PacketPtr incoming_pkt, PacketPtr coalesced_pkt)
     //* Rule 2: Coalesce requests only if they
     // share a TLB Mode, i.e. they are both read
     // or write requests.
-    BaseTLB::Mode incoming_mode = incoming_state->tlbMode;
-    BaseTLB::Mode coalesced_mode = coalesced_state->tlbMode;
+    BaseMMU::Mode incoming_mode = incoming_state->tlbMode;
+    BaseMMU::Mode coalesced_mode = coalesced_state->tlbMode;
 
     if (incoming_mode != coalesced_mode)
         return false;
@@ -127,7 +130,7 @@ TLBCoalescer::canCoalesce(PacketPtr incoming_pkt, PacketPtr coalesced_pkt)
     // when we can coalesce a packet update the reqCnt
     // that is the number of packets represented by
     // this coalesced packet
-    if (!incoming_state->prefetch)
+    if (!incoming_state->isPrefetch)
         coalesced_state->reqCnt.back() += incoming_state->reqCnt.back();
 
     return true;
@@ -170,7 +173,7 @@ TLBCoalescer::updatePhysAddresses(PacketPtr pkt)
 
         // we are sending the packet back, so pop the reqCnt associated
         // with this level in the TLB hiearchy
-        if (!sender_state->prefetch)
+        if (!sender_state->isPrefetch)
             sender_state->reqCnt.pop_back();
 
         /*
@@ -241,7 +244,7 @@ TLBCoalescer::CpuSidePort::recvTimingReq(PacketPtr pkt)
     // push back the port to remember the path back
     sender_state->ports.push_back(this);
 
-    bool update_stats = !sender_state->prefetch;
+    bool update_stats = !sender_state->isPrefetch;
 
     if (update_stats) {
         // if reqCnt is empty then this packet does not represent
@@ -337,7 +340,7 @@ TLBCoalescer::CpuSidePort::recvFunctional(PacketPtr pkt)
     TheISA::GpuTLB::TranslationState *sender_state =
         safe_cast<TheISA::GpuTLB::TranslationState*>(pkt->senderState);
 
-    bool update_stats = !sender_state->prefetch;
+    bool update_stats = !sender_state->isPrefetch;
 
     if (update_stats)
         coalescer->stats.uncoalescedAccesses++;
@@ -461,7 +464,7 @@ TLBCoalescer::processProbeTLBEvent()
                     safe_cast<TheISA::GpuTLB::TranslationState*>
                     (first_packet->senderState);
 
-                bool update_stats = !tmp_sender_state->prefetch;
+                bool update_stats = !tmp_sender_state->isPrefetch;
 
                 if (update_stats) {
                     // req_cnt is total number of packets represented
@@ -521,8 +524,8 @@ TLBCoalescer::processCleanupEvent()
     }
 }
 
-TLBCoalescer::TLBCoalescerStats::TLBCoalescerStats(Stats::Group *parent)
-    : Stats::Group(parent),
+TLBCoalescer::TLBCoalescerStats::TLBCoalescerStats(statistics::Group *parent)
+    : statistics::Group(parent),
       ADD_STAT(uncoalescedAccesses, "Number of uncoalesced TLB accesses"),
       ADD_STAT(coalescedAccesses, "Number of coalesced TLB accesses"),
       ADD_STAT(queuingCycles, "Number of cycles spent in queue"),
@@ -532,3 +535,5 @@ TLBCoalescer::TLBCoalescerStats::TLBCoalescerStats(Stats::Group *parent)
 {
     localLatency = localqueuingCycles / uncoalescedAccesses;
 }
+
+} // namespace gem5

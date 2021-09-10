@@ -51,24 +51,26 @@
 #include "cpu/thread_context.hh"
 #include "sim/system.hh"
 
+namespace gem5
+{
+
 TranslatingPortProxy::TranslatingPortProxy(
         ThreadContext *tc, Request::Flags _flags) :
-    PortProxy(tc->getCpuPtr()->getSendFunctional(),
-              tc->getSystemPtr()->cacheLineSize()), _tc(tc),
+    PortProxy(tc, tc->getSystemPtr()->cacheLineSize()), _tc(tc),
               pageBytes(tc->getSystemPtr()->getPageBytes()),
               flags(_flags)
 {}
 
 bool
-TranslatingPortProxy::tryTLBsOnce(RequestPtr req, BaseTLB::Mode mode) const
+TranslatingPortProxy::tryTLBsOnce(RequestPtr req, BaseMMU::Mode mode) const
 {
     BaseMMU *mmu = _tc->getMMUPtr();
     return mmu->translateFunctional(req, _tc, mode) == NoFault ||
-           mmu->translateFunctional(req, _tc, BaseTLB::Execute) == NoFault;
+           mmu->translateFunctional(req, _tc, BaseMMU::Execute) == NoFault;
 }
 
 bool
-TranslatingPortProxy::tryTLBs(RequestPtr req, BaseTLB::Mode mode) const
+TranslatingPortProxy::tryTLBs(RequestPtr req, BaseMMU::Mode mode) const
 {
     // If at first this doesn't succeed, try to fixup and translate again. If
     // it still fails, report failure.
@@ -86,7 +88,7 @@ TranslatingPortProxy::tryReadBlob(Addr addr, void *p, int size) const
                 gen.addr(), gen.size(), flags, Request::funcRequestorId, 0,
                 _tc->contextId());
 
-        if (!tryTLBs(req, BaseTLB::Read))
+        if (!tryTLBs(req, BaseMMU::Read))
             return false;
 
         PortProxy::readBlobPhys(
@@ -108,7 +110,7 @@ TranslatingPortProxy::tryWriteBlob(
                 gen.addr(), gen.size(), flags, Request::funcRequestorId, 0,
                 _tc->contextId());
 
-        if (!tryTLBs(req, BaseTLB::Write))
+        if (!tryTLBs(req, BaseMMU::Write))
             return false;
 
         PortProxy::writeBlobPhys(
@@ -128,7 +130,7 @@ TranslatingPortProxy::tryMemsetBlob(Addr address, uint8_t v, int size) const
                 gen.addr(), gen.size(), flags, Request::funcRequestorId, 0,
                 _tc->contextId());
 
-        if (!tryTLBs(req, BaseTLB::Write))
+        if (!tryTLBs(req, BaseMMU::Write))
             return false;
 
         PortProxy::memsetBlobPhys(
@@ -136,3 +138,5 @@ TranslatingPortProxy::tryMemsetBlob(Addr address, uint8_t v, int size) const
     }
     return true;
 }
+
+} // namespace gem5

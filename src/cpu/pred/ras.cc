@@ -28,6 +28,12 @@
 
 #include "cpu/pred/ras.hh"
 
+namespace gem5
+{
+
+namespace branch_prediction
+{
+
 void
 ReturnAddrStack::init(unsigned _numEntries)
 {
@@ -79,3 +85,6 @@ ReturnAddrStack::restore(unsigned top_entry_idx,
         ++usedEntries;
     }
 }
+
+} // namespace branch_prediction
+} // namespace gem5

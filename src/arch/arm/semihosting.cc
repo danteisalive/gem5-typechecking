@@ -58,6 +58,9 @@
 #include "sim/sim_exit.hh"
 #include "sim/system.hh"
 
+namespace gem5
+{
+
 const std::map<uint32_t, ArmSemihosting::SemiCall> ArmSemihosting::calls{
     { SYS_OPEN,     { "SYS_OPEN", &ArmSemihosting::callOpen } },
     { SYS_CLOSE,    { "SYS_CLOSE", &ArmSemihosting::callClose } },
@@ -500,13 +503,13 @@ ArmSemihosting::callRename(ThreadContext *tc, Addr from_addr, size_t from_size,
 ArmSemihosting::RetErrno
 ArmSemihosting::callClock(ThreadContext *tc)
 {
-    return retOK(curTick() / (SimClock::Int::s / 100));
+    return retOK(curTick() / (sim_clock::as_int::s / 100));
 }
 
 ArmSemihosting::RetErrno
 ArmSemihosting::callTime(ThreadContext *tc)
 {
-    return retOK(timeBase + round(curTick() / SimClock::Float::s));
+    return retOK(timeBase + round(curTick() / sim_clock::as_float::s));
 }
 
 ArmSemihosting::RetErrno
@@ -548,14 +551,14 @@ ArmSemihosting::gatherHeapInfo(ThreadContext *tc, bool aarch64,
                                Addr &heap_base, Addr &heap_limit,
                                Addr &stack_base, Addr &stack_limit)
 {
-    const PhysicalMemory &phys = tc->getSystemPtr()->getPhysMem();
+    const memory::PhysicalMemory &phys = tc->getSystemPtr()->getPhysMem();
     const AddrRangeList memories = phys.getConfAddrRanges();
     fatal_if(memories.size() < 1, "No memories reported from System");
     warn_if(memories.size() > 1, "Multiple physical memory ranges available. "
             "Using first range heap/stack.");
-    const AddrRange memory = *memories.begin();
-    const Addr mem_start = memory.start() + memReserve;
-    Addr mem_end = memory.end();
+    const AddrRange mem = *memories.begin();
+    const Addr mem_start = mem.start() + memReserve;
+    Addr mem_end = mem.end();
 
     // Make sure that 32-bit guests can access their memory.
     if (!aarch64) {
@@ -672,7 +675,7 @@ ArmSemihosting::callElapsed64(ThreadContext *tc, InPlaceArg ticks)
 ArmSemihosting::RetErrno
 ArmSemihosting::callTickFreq(ThreadContext *tc)
 {
-    return retOK(semiTick(SimClock::Frequency));
+    return retOK(semiTick(sim_clock::Frequency));
 }
 
 
@@ -702,7 +705,8 @@ struct SemiPseudoAbi64 : public ArmSemihosting::Abi64
     };
 };
 
-namespace GuestABI
+GEM5_DEPRECATED_NAMESPACE(GuestABI, guest_abi);
+namespace guest_abi
 {
 
 // Handle arguments the same as for semihosting operations. Skipping the first
@@ -716,16 +720,16 @@ struct Argument<SemiPseudoAbi64, T> :
     public Argument<ArmSemihosting::Abi64, T>
 {};
 
-} // namespace GuestABI
+} // namespace guest_abi
 
 ArmSemihosting::RetErrno
 ArmSemihosting::callGem5PseudoOp32(ThreadContext *tc, uint32_t encoded_func)
 {
     uint8_t func;
-    PseudoInst::decodeAddrOffset(encoded_func, func);
+    pseudo_inst::decodeAddrOffset(encoded_func, func);
 
     uint64_t ret;
-    if (PseudoInst::pseudoInst<SemiPseudoAbi32>(tc, func, ret))
+    if (pseudo_inst::pseudoInst<SemiPseudoAbi32>(tc, func, ret))
         return retOK(ret);
     else
         return retError(EINVAL);
@@ -735,10 +739,10 @@ ArmSemihosting::RetErrno
 ArmSemihosting::callGem5PseudoOp64(ThreadContext *tc, uint64_t encoded_func)
 {
     uint8_t func;
-    PseudoInst::decodeAddrOffset(encoded_func, func);
+    pseudo_inst::decodeAddrOffset(encoded_func, func);
 
     uint64_t ret;
-    if (PseudoInst::pseudoInst<SemiPseudoAbi64>(tc, func, ret))
+    if (pseudo_inst::pseudoInst<SemiPseudoAbi64>(tc, func, ret))
         return retOK(ret);
     else
         return retError(EINVAL);
@@ -1043,3 +1047,5 @@ operator << (std::ostream &os, const ArmSemihosting::InPlaceArg &ipa)
     ccprintf(os, "[%#x-%#x)", ipa.addr, ipa.addr + ipa.size - 1);
     return os;
 }
+
+} // namespace gem5

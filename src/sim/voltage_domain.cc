@@ -45,6 +45,9 @@
 #include "params/VoltageDomain.hh"
 #include "sim/serialize.hh"
 
+namespace gem5
+{
+
 VoltageDomain::VoltageDomain(const Params &p)
     : SimObject(p), voltageOpPoints(p.voltage), _perfLevel(0), stats(*this)
 {
@@ -138,8 +141,10 @@ VoltageDomain::unserialize(CheckpointIn &cp)
 }
 
 VoltageDomain::VoltageDomainStats::VoltageDomainStats(VoltageDomain &vd)
-    : Stats::Group(&vd),
-    ADD_STAT(voltage, UNIT_VOLT, "Voltage in Volts")
+    : statistics::Group(&vd),
+    ADD_STAT(voltage, statistics::units::Volt::get(), "Voltage in Volts")
 {
     voltage.method(&vd, &VoltageDomain::voltage);
 }
+
+} // namespace gem5

@@ -30,6 +30,9 @@
 
 #include "arch/generic/tlb.hh"
 
+namespace gem5
+{
+
 namespace Iris
 {
 
@@ -43,21 +46,25 @@ class TLB : public BaseTLB
     void takeOverFrom(BaseTLB *otlb) override {}
 
     Fault translateFunctional(
-        const RequestPtr &req, ::ThreadContext *tc, Mode mode) override;
+        const RequestPtr &req, gem5::ThreadContext *tc,
+        BaseMMU::Mode mode) override;
     Fault translateAtomic(
-        const RequestPtr &req, ::ThreadContext *tc, Mode mode) override;
+        const RequestPtr &req, gem5::ThreadContext *tc,
+        BaseMMU::Mode mode) override;
     void translateTiming(
-        const RequestPtr &req, ::ThreadContext *tc,
-        Translation *translation, Mode mode) override;
+        const RequestPtr &req, gem5::ThreadContext *tc,
+        BaseMMU::Translation *translation, BaseMMU::Mode mode) override;
 
     Fault
     finalizePhysical(
-        const RequestPtr &req, ::ThreadContext *tc, Mode mode) const override
+        const RequestPtr &req, gem5::ThreadContext *tc,
+        BaseMMU::Mode mode) const override
     {
         return NoFault;
     }
 };
 
 } // namespace Iris
+} // namespace gem5
 
 #endif // __ARCH_ARM_FASTMODEL_IRIS_TLB_HH__

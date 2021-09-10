@@ -76,6 +76,10 @@
  * - Checkpointing is not supported
  * - Stall/resume for faulting transactions is not supported
  */
+
+namespace gem5
+{
+
 class SMMUTranslationProcess;
 
 class SMMUv3 : public ClockedObject
@@ -133,15 +137,15 @@ class SMMUv3 : public ClockedObject
     const Cycles walkLat;
 
     // Stats
-    struct SMMUv3Stats : public Stats::Group
+    struct SMMUv3Stats : public statistics::Group
     {
-        SMMUv3Stats(Stats::Group *parent);
-        Stats::Scalar steL1Fetches;
-        Stats::Scalar steFetches;
-        Stats::Scalar cdL1Fetches;
-        Stats::Scalar cdFetches;
-        Stats::Distribution translationTimeDist;
-        Stats::Distribution ptwTimeDist;
+        SMMUv3Stats(statistics::Group *parent);
+        statistics::Scalar steL1Fetches;
+        statistics::Scalar steFetches;
+        statistics::Scalar cdL1Fetches;
+        statistics::Scalar cdFetches;
+        statistics::Distribution translationTimeDist;
+        statistics::Distribution ptwTimeDist;
     } stats;
 
     std::vector<SMMUv3DeviceInterface *> deviceInterfaces;
@@ -194,5 +198,7 @@ class SMMUv3 : public ClockedObject
     virtual Port &getPort(const std::string &name,
                           PortID id = InvalidPortID) override;
 };
+
+} // namespace gem5
 
 #endif /* __DEV_ARM_SMMU_V3_HH__ */

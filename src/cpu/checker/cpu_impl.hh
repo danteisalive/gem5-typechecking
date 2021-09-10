@@ -47,8 +47,8 @@
 
 #include "base/refcnt.hh"
 #include "config/the_isa.hh"
-#include "cpu/base_dyn_inst.hh"
 #include "cpu/exetrace.hh"
+#include "cpu/null_static_inst.hh"
 #include "cpu/reg_class.hh"
 #include "cpu/simple_thread.hh"
 #include "cpu/static_inst.hh"
@@ -59,20 +59,23 @@
 #include "sim/sim_object.hh"
 #include "sim/stats.hh"
 
-template <class Impl>
+namespace gem5
+{
+
+template <class DynInstPtr>
 void
-Checker<Impl>::advancePC(const Fault &fault)
+Checker<DynInstPtr>::advancePC(const Fault &fault)
 {
     if (fault != NoFault) {
-        curMacroStaticInst = StaticInst::nullStaticInstPtr;
+        curMacroStaticInst = nullStaticInstPtr;
         fault->invoke(tc, curStaticInst);
         thread->decoder.reset();
     } else {
         if (curStaticInst) {
             if (curStaticInst->isLastMicroop())
-                curMacroStaticInst = StaticInst::nullStaticInstPtr;
+                curMacroStaticInst = nullStaticInstPtr;
             TheISA::PCState pcState = thread->pcState();
-            TheISA::advancePC(pcState, curStaticInst);
+            curStaticInst->advancePC(pcState);
             thread->pcState(pcState);
             DPRINTF(Checker, "Advancing PC to %s.\n", thread->pcState());
         }
@@ -80,9 +83,9 @@ Checker<Impl>::advancePC(const Fault &fault)
 }
 //////////////////////////////////////////////////
 
-template <class Impl>
+template <class DynInstPtr>
 void
-Checker<Impl>::handlePendingInt()
+Checker<DynInstPtr>::handlePendingInt()
 {
     DPRINTF(Checker, "IRQ detected at PC: %s with %d insts in buffer\n",
                      thread->pcState(), instList.size());
@@ -111,12 +114,12 @@ Checker<Impl>::handlePendingInt()
     }
     boundaryInst = NULL;
     thread->decoder.reset();
-    curMacroStaticInst = StaticInst::nullStaticInstPtr;
+    curMacroStaticInst = nullStaticInstPtr;
 }
 
-template <class Impl>
+template <class DynInstPtr>
 void
-Checker<Impl>::verify(const DynInstPtr &completed_inst)
+Checker<DynInstPtr>::verify(const DynInstPtr &completed_inst)
 {
     DynInstPtr inst;
 
@@ -180,6 +183,9 @@ Checker<Impl>::verify(const DynInstPtr &completed_inst)
     unverifiedInst = inst;
     inst = NULL;
 
+    auto &decoder = thread->decoder;
+    const Addr pc_mask = decoder.pcMask();
+
     // Try to check all instructions that are completed, ending if we
     // run out of instructions to check or if an instruction is not
     // yet completed.
@@ -198,7 +204,7 @@ Checker<Impl>::verify(const DynInstPtr &completed_inst)
         Fault fault = NoFault;
 
         // maintain $r0 semantics
-        thread->setIntReg(TheISA::ZeroReg, 0);
+        thread->setIntReg(zeroReg, 0);
 
         // Check if any recent PC changes match up with anything we
         // expect to happen.  This is mostly to check if traps or
@@ -223,26 +229,23 @@ Checker<Impl>::verify(const DynInstPtr &completed_inst)
         // Try to fetch the instruction
         uint64_t fetchOffset = 0;
         bool fetchDone = false;
-
         while (!fetchDone) {
             Addr fetch_PC = thread->instAddr();
-            fetch_PC = (fetch_PC & PCMask) + fetchOffset;
-
-            TheISA::MachInst machInst;
+            fetch_PC = (fetch_PC & pc_mask) + fetchOffset;
 
             // If not in the middle of a macro instruction
             if (!curMacroStaticInst) {
                 // set up memory request for instruction fetch
                 auto mem_req = std::make_shared<Request>(
-                    fetch_PC, sizeof(TheISA::MachInst), 0, requestorId,
+                    fetch_PC, decoder.moreBytesSize(), 0, requestorId,
                     fetch_PC, thread->contextId());
 
-                mem_req->setVirt(fetch_PC, sizeof(TheISA::MachInst),
+                mem_req->setVirt(fetch_PC, decoder.moreBytesSize(),
                                  Request::INST_FETCH, requestorId,
                                  thread->instAddr());
 
                 fault = mmu->translateFunctional(
-                    mem_req, tc, BaseTLB::Execute);
+                    mem_req, tc, BaseMMU::Execute);
 
                 if (fault != NoFault) {
                     if (unverifiedInst->getFault() == NoFault) {
@@ -271,7 +274,7 @@ Checker<Impl>::verify(const DynInstPtr &completed_inst)
                 } else {
                     PacketPtr pkt = new Packet(mem_req, MemCmd::ReadReq);
 
-                    pkt->dataStatic(&machInst);
+                    pkt->dataStatic(decoder.moreBytesPtr());
                     icachePort->sendFunctional(pkt);
 
                     delete pkt;
@@ -283,7 +286,7 @@ Checker<Impl>::verify(const DynInstPtr &completed_inst)
 
                 if (isRomMicroPC(pcState.microPC())) {
                     fetchDone = true;
-                    curStaticInst = thread->decoder.fetchRomMicroop(
+                    curStaticInst = decoder.fetchRomMicroop(
                             pcState.microPC(), nullptr);
                 } else if (!curMacroStaticInst) {
                     //We're not in the middle of a macro instruction
@@ -291,19 +294,20 @@ Checker<Impl>::verify(const DynInstPtr &completed_inst)
 
                     //Predecode, ie bundle up an ExtMachInst
                     //If more fetch data is needed, pass it in.
-                    Addr fetchPC = (pcState.instAddr() & PCMask) + fetchOffset;
-                    thread->decoder.moreBytes(pcState, fetchPC, machInst);
+                    Addr fetchPC =
+                        (pcState.instAddr() & pc_mask) + fetchOffset;
+                    decoder.moreBytes(pcState, fetchPC);
 
                     //If an instruction is ready, decode it.
                     //Otherwise, we'll have to fetch beyond the
-                    //MachInst at the current pc.
-                    if (thread->decoder.instReady()) {
+                    //memory chunk at the current pc.
+                    if (decoder.instReady()) {
                         fetchDone = true;
-                        instPtr = thread->decoder.decode(pcState);
+                        instPtr = decoder.decode(pcState);
                         thread->pcState(pcState);
                     } else {
                         fetchDone = false;
-                        fetchOffset += sizeof(TheISA::MachInst);
+                        fetchOffset += decoder.moreBytesSize();
                     }
 
                     //If we decoded an instruction and it's microcoded,
@@ -324,7 +328,7 @@ Checker<Impl>::verify(const DynInstPtr &completed_inst)
             }
         }
         // reset decoder on Checker
-        thread->decoder.reset();
+        decoder.reset();
 
         // Check Checker and CPU get same instruction, and record
         // any faults the CPU may have had.
@@ -360,7 +364,6 @@ Checker<Impl>::verify(const DynInstPtr &completed_inst)
             }
 
             if (fault == NoFault && unverifiedFault == NoFault) {
-                thread->funcExeInst++;
                 // Checks to make sure instrution results are correct.
                 validateExecution(unverifiedInst);
 
@@ -385,7 +388,7 @@ Checker<Impl>::verify(const DynInstPtr &completed_inst)
                 willChangePC = true;
                 newPCState = thread->pcState();
                 DPRINTF(Checker, "Fault, PC is now %s\n", newPCState);
-                curMacroStaticInst = StaticInst::nullStaticInstPtr;
+                curMacroStaticInst = nullStaticInstPtr;
             }
         } else {
            advancePC(fault);
@@ -428,22 +431,19 @@ Checker<Impl>::verify(const DynInstPtr &completed_inst)
     unverifiedInst = NULL;
 }
 
-template <class Impl>
+template <class DynInstPtr>
 void
-Checker<Impl>::switchOut()
+Checker<DynInstPtr>::switchOut()
 {
     instList.clear();
 }
 
-template <class Impl>
-void
-Checker<Impl>::takeOverFrom(BaseCPU *oldCPU)
-{
-}
+template <class DynInstPtr>
+void Checker<DynInstPtr>::takeOverFrom(BaseCPU *oldCPU) {}
 
-template <class Impl>
+template <class DynInstPtr>
 void
-Checker<Impl>::validateInst(const DynInstPtr &inst)
+Checker<DynInstPtr>::validateInst(const DynInstPtr &inst)
 {
     if (inst->instAddr() != thread->instAddr()) {
         warn("%lli: PCs do not match! Inst: %s, checker: %s",
@@ -462,9 +462,9 @@ Checker<Impl>::validateInst(const DynInstPtr &inst)
     }
 }
 
-template <class Impl>
+template <class DynInstPtr>
 void
-Checker<Impl>::validateExecution(const DynInstPtr &inst)
+Checker<DynInstPtr>::validateExecution(const DynInstPtr &inst)
 {
     InstResult checker_val;
     InstResult inst_val;
@@ -555,9 +555,9 @@ Checker<Impl>::validateExecution(const DynInstPtr &inst)
 // This function is weird, if it is called it means the Checker and
 // O3 have diverged, so panic is called for now.  It may be useful
 // to resynch states and continue if the divergence is a false positive
-template <class Impl>
+template <class DynInstPtr>
 void
-Checker<Impl>::validateState()
+Checker<DynInstPtr>::validateState()
 {
     if (updateThisCycle) {
         // Change this back to warn if divergences end up being false positives
@@ -580,10 +580,10 @@ Checker<Impl>::validateState()
     }
 }
 
-template <class Impl>
+template <class DynInstPtr>
 void
-Checker<Impl>::copyResult(const DynInstPtr &inst,
-                          const InstResult& mismatch_val, int start_idx)
+Checker<DynInstPtr>::copyResult(
+        const DynInstPtr &inst, const InstResult& mismatch_val, int start_idx)
 {
     // We've already popped one dest off the queue,
     // so do the fix-up then start with the next dest reg;
@@ -657,9 +657,9 @@ Checker<Impl>::copyResult(const DynInstPtr &inst,
     }
 }
 
-template <class Impl>
+template <class DynInstPtr>
 void
-Checker<Impl>::dumpAndExit(const DynInstPtr &inst)
+Checker<DynInstPtr>::dumpAndExit(const DynInstPtr &inst)
 {
     cprintf("Error detected, instruction information:\n");
     cprintf("PC:%s, nextPC:%#x\n[sn:%lli]\n[tid:%i]\n"
@@ -673,9 +673,9 @@ Checker<Impl>::dumpAndExit(const DynInstPtr &inst)
     CheckerCPU::dumpAndExit();
 }
 
-template <class Impl>
+template <class DynInstPtr>
 void
-Checker<Impl>::dumpInsts()
+Checker<DynInstPtr>::dumpInsts()
 {
     int num = 0;
 
@@ -702,5 +702,7 @@ Checker<Impl>::dumpInsts()
     }
 
 }
+
+} // namespace gem5
 
 #endif//__CPU_CHECKER_CPU_IMPL_HH__

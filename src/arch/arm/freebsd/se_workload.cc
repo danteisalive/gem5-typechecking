@@ -34,7 +34,7 @@
 #include "arch/arm/freebsd/se_workload.hh"
 
 #include <sys/syscall.h>
-#if !defined ( __GNU_LIBRARY__ ) && defined(__FreeBSD__)
+#if !defined( __GNU_LIBRARY__ ) && (defined(__FreeBSD__) || defined(__APPLE__))
 #include <sys/sysctl.h>
 #endif
 
@@ -44,6 +44,9 @@
 #include "cpu/thread_context.hh"
 #include "sim/syscall_emul.hh"
 
+namespace gem5
+{
+
 namespace
 {
 
@@ -51,27 +54,27 @@ class FreebsdLoader : public Process::Loader
 {
   public:
     Process *
-    load(const ProcessParams &params, ::Loader::ObjectFile *obj) override
+    load(const ProcessParams &params, loader::ObjectFile *obj) override
     {
         auto arch = obj->getArch();
         auto opsys = obj->getOpSys();
 
-        if (arch != ::Loader::Arm && arch != ::Loader::Thumb &&
-                arch != ::Loader::Arm64) {
+        if (arch != loader::Arm && arch != loader::Thumb &&
+                arch != loader::Arm64) {
             return nullptr;
         }
 
-        if (opsys != ::Loader::FreeBSD)
+        if (opsys != loader::FreeBSD)
             return nullptr;
 
-        if (arch == ::Loader::Arm64)
+        if (arch == loader::Arm64)
             return new ArmProcess64(params, obj, arch);
         else
             return new ArmProcess32(params, obj, arch);
     }
 };
 
-FreebsdLoader loader;
+FreebsdLoader freebsdLoader;
 
 } // anonymous namespace
 
@@ -157,3 +160,4 @@ EmuFreebsd::syscall(ThreadContext *tc)
 }
 
 } // namespace ArmISA
+} // namespace gem5

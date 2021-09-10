@@ -33,12 +33,15 @@
 #include <type_traits>
 #include <utility>
 
-#include "arch/arm/intregs.hh"
+#include "arch/arm/regs/int.hh"
 #include "arch/arm/utility.hh"
 #include "base/intmath.hh"
 #include "cpu/thread_context.hh"
 #include "sim/guest_abi.hh"
 #include "sim/proxy_ptr.hh"
+
+namespace gem5
+{
 
 class ThreadContext;
 
@@ -63,7 +66,8 @@ struct Aapcs64
     };
 };
 
-namespace GuestABI
+GEM5_DEPRECATED_NAMESPACE(GuestABI, guest_abi);
+namespace guest_abi
 {
 
 /*
@@ -186,7 +190,7 @@ struct Argument<Aapcs64, Float, typename std::enable_if_t<
     {
         if (state.nsrn <= state.MAX_SRN) {
             RegId id(VecRegClass, state.nsrn++);
-            return tc->readVecReg(id).laneView<Float, 0>();
+            return tc->readVecReg(id).as<Float>()[0];
         }
 
         return loadFromStack<Float>(tc, state);
@@ -203,7 +207,7 @@ struct Result<Aapcs64, Float, typename std::enable_if_t<
     {
         RegId id(VecRegClass, 0);
         auto reg = tc->readVecReg(id);
-        reg.laneView<Float, 0>() = f;
+        reg.as<Float>()[0] = f;
         tc->setVecReg(id, reg);
     }
 };
@@ -420,6 +424,7 @@ struct Result<Aapcs64, Composite, typename std::enable_if_t<
     }
 };
 
-} // namespace GuestABI
+} // namespace guest_abi
+} // namespace gem5
 
 #endif // __ARCH_ARM_AAPCS64_HH__

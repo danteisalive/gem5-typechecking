@@ -51,7 +51,10 @@
 #include "dev/arm/gic_v2.hh"
 #include "mem/physical.hh"
 
-using namespace Linux;
+namespace gem5
+{
+
+using namespace linux;
 using namespace ArmISA;
 
 ArmSystem::ArmSystem(const Params &p)
@@ -85,7 +88,7 @@ ArmSystem::ArmSystem(const Params &p)
                 workload->getEntry(), _resetAddr);
     }
 
-    bool wl_is_64 = (workload->getArch() == Loader::Arm64);
+    bool wl_is_64 = (workload->getArch() == loader::Arm64);
     if (wl_is_64 != _highestELIs64) {
         warn("Highest ARM exception-level set to AArch%d but the workload "
               "is for AArch%d. Assuming you wanted these to match.",
@@ -234,3 +237,5 @@ ArmSystem::callClearWakeRequest(ThreadContext *tc)
     if (FVPBasePwrCtrl *pwr_ctrl = getArmSystem(tc)->getPowerController())
         pwr_ctrl->clearWakeRequest(tc);
 }
+
+} // namespace gem5

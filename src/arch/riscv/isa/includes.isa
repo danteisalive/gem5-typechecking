@@ -74,6 +74,7 @@ output decoder {{
 #include "mem/request.hh"
 #include "sim/full_system.hh"
 
+using namespace gem5;
 using namespace RiscvISA;
 }};
 
@@ -88,7 +89,8 @@ output exec {{
 #include "arch/riscv/fp_inst.hh"
 #include "arch/riscv/mmu.hh"
 #include "arch/riscv/reg_abi.hh"
-#include "arch/riscv/registers.hh"
+#include "arch/riscv/regs/float.hh"
+#include "arch/riscv/regs/misc.hh"
 #include "arch/riscv/utility.hh"
 #include "base/condcodes.hh"
 #include "cpu/base.hh"
@@ -104,5 +106,6 @@ output exec {{
 #include "sim/sim_exit.hh"
 #include "sim/system.hh"
 
+using namespace gem5;
 using namespace RiscvISA;
 }};

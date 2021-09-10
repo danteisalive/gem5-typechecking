@@ -33,14 +33,19 @@
 #include "arch/sparc/mmu.hh"
 #include "arch/sparc/process.hh"
 #include "arch/sparc/se_workload.hh"
+#include "arch/sparc/sparc_traits.hh"
 #include "arch/sparc/types.hh"
 #include "base/bitfield.hh"
+#include "base/compiler.hh"
 #include "base/trace.hh"
 #include "cpu/base.hh"
 #include "cpu/thread_context.hh"
 #include "mem/page_table.hh"
 #include "sim/full_system.hh"
 #include "sim/process.hh"
+
+namespace gem5
+{
 
 namespace SparcISA
 {
@@ -812,7 +817,7 @@ TrapInstruction::invoke(ThreadContext *tc, const StaticInstPtr &inst)
 
     Process *p = tc->getProcessPtr();
 
-    M5_VAR_USED SparcProcess *sp = dynamic_cast<SparcProcess *>(p);
+    GEM5_VAR_USED SparcProcess *sp = dynamic_cast<SparcProcess *>(p);
     assert(sp);
 
     auto *workload = dynamic_cast<SEWorkload *>(tc->getSystemPtr()->workload);
@@ -826,4 +831,4 @@ TrapInstruction::invoke(ThreadContext *tc, const StaticInstPtr &inst)
 }
 
 } // namespace SparcISA
-
+} // namespace gem5

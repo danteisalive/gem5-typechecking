@@ -51,6 +51,11 @@
 #include "params/GenericTimerFrame.hh"
 #include "params/GenericTimerMem.hh"
 #include "params/SystemCounter.hh"
+#include "sim/core.hh"
+#include "sim/cur_tick.hh"
+
+namespace gem5
+{
 
 using namespace ArmISA;
 
@@ -74,7 +79,7 @@ SystemCounter::SystemCounter(const SystemCounterParams &p)
         "frequency table entries, limit surpassed\n");
     // Set the active frequency to be the base
     _freq = _freqTable.front();
-    _period = (1.0 / _freq) * SimClock::Frequency;
+    _period = (1.0 / _freq) * sim_clock::Frequency;
 }
 
 void
@@ -187,7 +192,7 @@ SystemCounter::freqUpdateCallback()
     _activeFreqEntry = _nextFreqEntry;
     _freq = _freqTable[_activeFreqEntry];
     _increment = _freqTable[0] / _freq;
-    _period = (1.0 / _freq) * SimClock::Frequency;
+    _period = (1.0 / _freq) * sim_clock::Frequency;
     notifyListeners();
 }
 
@@ -244,7 +249,7 @@ SystemCounter::unserialize(CheckpointIn &cp)
     }
     UNSERIALIZE_SCALAR(_nextFreqEntry);
 
-    _period = (1.0 / _freq) * SimClock::Frequency;
+    _period = (1.0 / _freq) * sim_clock::Frequency;
 }
 
 ArchTimer::ArchTimer(const std::string &name,
@@ -1580,3 +1585,5 @@ GenericTimerMem::timerCtrlWrite(Addr addr, size_t size, uint64_t data,
              "(0x%x:%i), assuming WI\n", addr, size);
     }
 }
+
+} // namespace gem5

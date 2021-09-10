@@ -44,6 +44,9 @@
 #include "gpu-compute/wavefront.hh"
 #include "params/ComputeUnit.hh"
 
+namespace gem5
+{
+
 ScoreboardCheckStage::ScoreboardCheckStage(const ComputeUnitParams &p,
                                            ComputeUnit &cu,
                                            ScoreboardCheckToSchedule
@@ -277,8 +280,8 @@ ScoreboardCheckStage::exec()
 }
 
 ScoreboardCheckStage::
-ScoreboardCheckStageStats::ScoreboardCheckStageStats(Stats::Group *parent)
-    : Stats::Group(parent, "ScoreboardCheckStage"),
+ScoreboardCheckStageStats::ScoreboardCheckStageStats(statistics::Group *parent)
+    : statistics::Group(parent, "ScoreboardCheckStage"),
       ADD_STAT(stallCycles, "number of cycles wave stalled in SCB")
 {
     stallCycles.init(NRDY_CONDITIONS);
@@ -291,3 +294,5 @@ ScoreboardCheckStageStats::ScoreboardCheckStageStats(Stats::Group *parent)
     stallCycles.subname(NRDY_SGPR_NRDY, csprintf("SgprBusy"));
     stallCycles.subname(INST_RDY, csprintf("InstrReady"));
 }
+
+} // namespace gem5

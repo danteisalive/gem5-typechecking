@@ -29,10 +29,13 @@
 #define __ARCH_ARM_LINUX_SE_WORKLOAD_HH__
 
 #include "arch/arm/linux/linux.hh"
-#include "arch/arm/registers.hh"
+#include "arch/arm/regs/int.hh"
 #include "arch/arm/se_workload.hh"
 #include "params/ArmEmuLinux.hh"
 #include "sim/syscall_desc.hh"
+
+namespace gem5
+{
 
 namespace ArmISA
 {
@@ -57,7 +60,8 @@ class EmuLinux : public SEWorkload
 
 } // namespace ArmISA
 
-namespace GuestABI
+GEM5_DEPRECATED_NAMESPACE(GuestABI, guest_abi);
+namespace guest_abi
 {
 
 template <typename ABI>
@@ -77,6 +81,7 @@ struct Result<ABI, SyscallReturn,
     }
 };
 
-} // namespace GuestABI
+} // namespace guest_abi
+} // namespace gem5
 
 #endif // __ARCH_ARM_LINUX_SE_WORKLOAD_HH__

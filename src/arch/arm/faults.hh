@@ -42,12 +42,16 @@
 #ifndef __ARM_FAULTS_HH__
 #define __ARM_FAULTS_HH__
 
-#include "arch/arm/miscregs.hh"
 #include "arch/arm/pagetable.hh"
+#include "arch/arm/regs/misc.hh"
 #include "arch/arm/types.hh"
 #include "base/logging.hh"
+#include "cpu/null_static_inst.hh"
 #include "sim/faults.hh"
 #include "sim/full_system.hh"
+
+namespace gem5
+{
 
 // The design of the "name" and "vect" functions is in sim/faults.hh
 
@@ -221,9 +225,9 @@ class ArmFault : public FaultBase
     MiscRegIndex getFaultAddrReg64() const;
 
     void invoke(ThreadContext *tc, const StaticInstPtr &inst =
-                StaticInst::nullStaticInstPtr) override;
+                nullStaticInstPtr) override;
     void invoke64(ThreadContext *tc, const StaticInstPtr &inst =
-                  StaticInst::nullStaticInstPtr);
+                  nullStaticInstPtr);
     void update(ThreadContext *tc);
     bool isResetSPSR(){ return bStep; }
 
@@ -295,7 +299,7 @@ class Reset : public ArmFaultVals<Reset>
 
   public:
     void invoke(ThreadContext *tc, const StaticInstPtr &inst =
-                StaticInst::nullStaticInstPtr) override;
+                nullStaticInstPtr) override;
 };
 
 class UndefinedInstruction : public ArmFaultVals<UndefinedInstruction>
@@ -323,7 +327,7 @@ class UndefinedInstruction : public ArmFaultVals<UndefinedInstruction>
     {}
 
     void invoke(ThreadContext *tc, const StaticInstPtr &inst =
-                StaticInst::nullStaticInstPtr) override;
+                nullStaticInstPtr) override;
     bool routeToHyp(ThreadContext *tc) const override;
     ExceptionClass ec(ThreadContext *tc) const override;
     uint32_t iss() const override;
@@ -344,7 +348,7 @@ class SupervisorCall : public ArmFaultVals<SupervisorCall>
     }
 
     void invoke(ThreadContext *tc, const StaticInstPtr &inst =
-                StaticInst::nullStaticInstPtr) override;
+                nullStaticInstPtr) override;
     bool routeToHyp(ThreadContext *tc) const override;
     ExceptionClass ec(ThreadContext *tc) const override;
     uint32_t iss() const override;
@@ -361,7 +365,7 @@ class SecureMonitorCall : public ArmFaultVals<SecureMonitorCall>
     }
 
     void invoke(ThreadContext *tc, const StaticInstPtr &inst =
-                StaticInst::nullStaticInstPtr) override;
+                nullStaticInstPtr) override;
     ExceptionClass ec(ThreadContext *tc) const override;
     uint32_t iss() const override;
     uint32_t vectorCatchFlag() const override { return 0x00000400; }
@@ -452,7 +456,7 @@ class AbortFault : public ArmFaultVals<T>
     bool stage2;
     bool s1ptw;
     ArmFault::TranMethod tranMethod;
-    ArmFault::DebugType debug;
+    ArmFault::DebugType debugType;
 
   public:
     AbortFault(Addr _faultAddr, bool _write, TlbEntry::DomainType _domain,
@@ -461,13 +465,14 @@ class AbortFault : public ArmFaultVals<T>
                ArmFault::DebugType _debug = ArmFault::NODEBUG) :
         faultAddr(_faultAddr), OVAddr(0), write(_write),
         domain(_domain), source(_source), srcEncoded(0),
-        stage2(_stage2), s1ptw(false), tranMethod(_tranMethod), debug(_debug)
+        stage2(_stage2), s1ptw(false), tranMethod(_tranMethod),
+        debugType(_debug)
     {}
 
     bool getFaultVAddr(Addr &va) const override;
 
     void invoke(ThreadContext *tc, const StaticInstPtr &inst =
-                StaticInst::nullStaticInstPtr) override;
+                nullStaticInstPtr) override;
 
     FSR getFsr(ThreadContext *tc) const override;
     uint8_t getFaultStatusCode(ThreadContext *tc) const;
@@ -590,7 +595,7 @@ class PCAlignmentFault : public ArmFaultVals<PCAlignmentFault>
     PCAlignmentFault(Addr _faultPC) : faultPC(_faultPC)
     {}
     void invoke(ThreadContext *tc, const StaticInstPtr &inst =
-                StaticInst::nullStaticInstPtr) override;
+                nullStaticInstPtr) override;
     bool routeToHyp(ThreadContext *tc) const override;
 };
 
@@ -608,7 +613,7 @@ class SystemError : public ArmFaultVals<SystemError>
   public:
     SystemError();
     void invoke(ThreadContext *tc, const StaticInstPtr &inst =
-                StaticInst::nullStaticInstPtr) override;
+                nullStaticInstPtr) override;
     bool routeToMonitor(ThreadContext *tc) const override;
     bool routeToHyp(ThreadContext *tc) const override;
 };
@@ -629,7 +634,7 @@ class HardwareBreakpoint : public ArmFaultVals<HardwareBreakpoint>
     Addr vAddr;
   public:
     void invoke(ThreadContext *tc, const StaticInstPtr &inst =
-                StaticInst::nullStaticInstPtr) override;
+                nullStaticInstPtr) override;
     HardwareBreakpoint(Addr _vaddr, uint32_t _iss);
     bool routeToHyp(ThreadContext *tc) const override;
     ExceptionClass ec(ThreadContext *tc) const override;
@@ -645,7 +650,7 @@ class Watchpoint : public ArmFaultVals<Watchpoint>
   public:
     Watchpoint(ExtMachInst _mach_inst, Addr _vaddr, bool _write, bool _cm);
     void invoke(ThreadContext *tc, const StaticInstPtr &inst =
-                StaticInst::nullStaticInstPtr) override;
+                nullStaticInstPtr) override;
     bool routeToHyp(ThreadContext *tc) const override;
     uint32_t iss() const override;
     ExceptionClass ec(ThreadContext *tc) const override;
@@ -671,7 +676,7 @@ class ArmSev : public ArmFaultVals<ArmSev>
   public:
     ArmSev () {}
     void invoke(ThreadContext *tc, const StaticInstPtr &inst =
-                StaticInst::nullStaticInstPtr) override;
+                nullStaticInstPtr) override;
 };
 
 /// Illegal Instruction Set State fault (AArch64 only)
@@ -724,7 +729,7 @@ template<> ArmFault::FaultVals ArmFaultVals<ArmSev>::vals;
  */
 bool getFaultVAddr(Fault fault, Addr &va);
 
-
 } // namespace ArmISA
+} // namespace gem5
 
 #endif // __ARM_FAULTS_HH__

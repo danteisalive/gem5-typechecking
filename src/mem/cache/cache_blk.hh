@@ -57,7 +57,10 @@
 #include "mem/cache/tags/tagged_entry.hh"
 #include "mem/packet.hh"
 #include "mem/request.hh"
-#include "sim/core.hh"
+#include "sim/cur_tick.hh"
+
+namespace gem5
+{
 
 /**
  * A Basic Cache block.
@@ -110,7 +113,8 @@ class CacheBlk : public TaggedEntry
      * Represents that the indicated thread context has a "lock" on
      * the block, in the LL/SC sense.
      */
-    class Lock {
+    class Lock
+    {
       public:
         ContextID contextId;     // locking context
         Addr lowAddr;      // low address of lock range
@@ -200,7 +204,7 @@ class CacheBlk : public TaggedEntry
         clearPrefetched();
         clearCoherenceBits(AllBits);
 
-        setTaskId(ContextSwitchTaskId::Unknown);
+        setTaskId(context_switch_task_id::Unknown);
         setWhenReady(MaxTick);
         setRefCount(0);
         setSrcRequestorId(Request::invldRequestorId);
@@ -395,8 +399,9 @@ class CacheBlk : public TaggedEntry
           default:    s = 'T'; break; // @TODO add other types
         }
         return csprintf("state: %x (%c) writable: %d readable: %d "
-            "dirty: %d | %s", coherence, s, isSet(WritableBit),
-            isSet(ReadableBit), isSet(DirtyBit), TaggedEntry::print());
+            "dirty: %d prefetched: %d | %s", coherence, s,
+            isSet(WritableBit), isSet(ReadableBit), isSet(DirtyBit),
+            wasPrefetched(), TaggedEntry::print());
     }
 
     /**
@@ -555,5 +560,7 @@ class CacheBlkPrintWrapper : public Printable
     void print(std::ostream &o, int verbosity = 0,
                const std::string &prefix = "") const;
 };
+
+} // namespace gem5
 
 #endif //__MEM_CACHE_CACHE_BLK_HH__

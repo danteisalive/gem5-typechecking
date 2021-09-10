@@ -48,6 +48,8 @@
 
 #include <iostream>
 
+#include "arch/generic/isa.hh"
+#include "base/named.hh"
 #include "base/refcnt.hh"
 #include "base/types.hh"
 #include "cpu/inst_seq.hh"
@@ -57,7 +59,11 @@
 #include "sim/faults.hh"
 #include "sim/insttracer.hh"
 
-namespace Minor
+namespace gem5
+{
+
+GEM5_DEPRECATED_NAMESPACE(Minor, minor);
+namespace minor
 {
 
 class MinorDynInst;
@@ -272,7 +278,8 @@ class MinorDynInst : public RefCounted
 
     /** Print (possibly verbose) instruction information for
      *  MinorTrace using the given Named object's name */
-    void minorTraceInst(const Named &named_object) const;
+    void minorTraceInst(const Named &named_object,
+            const BaseISA::RegClasses &reg_classes) const;
 
     /** ReportIF interface */
     void reportData(std::ostream &os) const;
@@ -291,6 +298,7 @@ class MinorDynInst : public RefCounted
 /** Print a summary of the instruction */
 std::ostream &operator <<(std::ostream &os, const MinorDynInst &inst);
 
-}
+} // namespace minor
+} // namespace gem5
 
 #endif /* __CPU_MINOR_DYN_INST_HH__ */

@@ -54,6 +54,9 @@
 #include "sim/byteswap.hh"
 #include "sim/full_system.hh"
 
+namespace gem5
+{
+
 namespace ArmISA
 {
 
@@ -85,9 +88,9 @@ class ArmStaticInst : public StaticInst
         int64_t midRes = sub ? (op1 - op2) : (op1 + op2);
         if (bits(midRes, width) != bits(midRes, width - 1)) {
             if (midRes > 0)
-                res = (LL(1) << (width - 1)) - 1;
+                res = (1LL << (width - 1)) - 1;
             else
-                res = -(LL(1) << (width - 1));
+                res = -(1LL << (width - 1));
             return true;
         } else {
             res = midRes;
@@ -99,11 +102,11 @@ class ArmStaticInst : public StaticInst
     satInt(int32_t &res, int64_t op, int width)
     {
         width--;
-        if (op >= (LL(1) << width)) {
-            res = (LL(1) << width) - 1;
+        if (op >= (1LL << width)) {
+            res = (1LL << width) - 1;
             return true;
-        } else if (op < -(LL(1) << width)) {
-            res = -(LL(1) << width);
+        } else if (op < -(1LL << width)) {
+            res = -(1LL << width);
             return true;
         } else {
             res = op;
@@ -116,8 +119,8 @@ class ArmStaticInst : public StaticInst
     uSaturateOp(uint32_t &res, int64_t op1, int64_t op2, bool sub=false)
     {
         int64_t midRes = sub ? (op1 - op2) : (op1 + op2);
-        if (midRes >= (LL(1) << width)) {
-            res = (LL(1) << width) - 1;
+        if (midRes >= (1LL << width)) {
+            res = (1LL << width) - 1;
             return true;
         } else if (midRes < 0) {
             res = 0;
@@ -131,8 +134,8 @@ class ArmStaticInst : public StaticInst
     static inline bool
     uSatInt(int32_t &res, int64_t op, int width)
     {
-        if (op >= (LL(1) << width)) {
-            res = (LL(1) << width) - 1;
+        if (op >= (1LL << width)) {
+            res = (1LL << width) - 1;
             return true;
         } else if (op < 0) {
             res = 0;
@@ -143,10 +146,12 @@ class ArmStaticInst : public StaticInst
         }
     }
 
+    ExtMachInst machInst;
+
     // Constructor
     ArmStaticInst(const char *mnem, ExtMachInst _machInst,
                   OpClass __opClass)
-        : StaticInst(mnem, _machInst, __opClass)
+        : StaticInst(mnem, __opClass), machInst(_machInst)
     {
         aarch64 = machInst.aarch64;
         if (bits(machInst, 28, 24) == 0x10)
@@ -171,10 +176,10 @@ class ArmStaticInst : public StaticInst
                        bool withCond64 = false,
                        ConditionCode cond64 = COND_UC) const;
     void printTarget(std::ostream &os, Addr target,
-                     const Loader::SymbolTable *symtab) const;
+                     const loader::SymbolTable *symtab) const;
     void printCondition(std::ostream &os, unsigned code,
                         bool noImplicit=false) const;
-    void printMemSymbol(std::ostream &os, const Loader::SymbolTable *symtab,
+    void printMemSymbol(std::ostream &os, const loader::SymbolTable *symtab,
                         const std::string &prefix, const Addr addr,
                         const std::string &suffix) const;
     void printShiftOperand(std::ostream &os, IntRegIndex rm,
@@ -199,8 +204,16 @@ class ArmStaticInst : public StaticInst
 
     uint64_t getEMI() const override { return machInst; }
 
+    PCState
+    buildRetPC(const PCState &curPC, const PCState &callPC) const override
+    {
+        PCState retPC = callPC;
+        retPC.uEnd();
+        return retPC;
+    }
+
     std::string generateDisassembly(
-            Addr pc, const Loader::SymbolTable *symtab) const override;
+            Addr pc, const loader::SymbolTable *symtab) const override;
 
     static void
     activateBreakpoint(ThreadContext *tc)
@@ -337,7 +350,8 @@ class ArmStaticInst : public StaticInst
     cSwap(T val, bool big)
     {
         const unsigned count = sizeof(T) / sizeof(E);
-        union {
+        union
+        {
             T tVal;
             E eVals[count];
         } conv;
@@ -563,6 +577,8 @@ class ArmStaticInst : public StaticInst
         return getCurSveVecLenInBits(tc) / (8 * sizeof(T));
     }
 };
-}
+
+} // namespace ArmISA
+} // namespace gem5
 
 #endif //__ARCH_ARM_INSTS_STATICINST_HH__

@@ -55,6 +55,12 @@
 #include "sim/probe/pmu.hh"
 #include "sim/sim_object.hh"
 
+namespace gem5
+{
+
+namespace branch_prediction
+{
+
 /**
  * Basically a wrapper class to hold both the branch predictor
  * and the BTB.
@@ -185,7 +191,8 @@ class BPredUnit : public SimObject
     void dump();
 
   private:
-    struct PredictorHistory {
+    struct PredictorHistory
+    {
         /**
          * Makes a predictor history struct that contains any
          * information needed to update the predictor, BTB, and RAS.
@@ -277,34 +284,35 @@ class BPredUnit : public SimObject
     /** The indirect target predictor. */
     IndirectPredictor * iPred;
 
-    struct BPredUnitStats : public Stats::Group {
-        BPredUnitStats(Stats::Group *parent);
+    struct BPredUnitStats : public statistics::Group
+    {
+        BPredUnitStats(statistics::Group *parent);
 
         /** Stat for number of BP lookups. */
-        Stats::Scalar lookups;
+        statistics::Scalar lookups;
         /** Stat for number of conditional branches predicted. */
-        Stats::Scalar condPredicted;
+        statistics::Scalar condPredicted;
         /** Stat for number of conditional branches predicted incorrectly. */
-        Stats::Scalar condIncorrect;
+        statistics::Scalar condIncorrect;
         /** Stat for number of BTB lookups. */
-        Stats::Scalar BTBLookups;
+        statistics::Scalar BTBLookups;
         /** Stat for number of BTB hits. */
-        Stats::Scalar BTBHits;
+        statistics::Scalar BTBHits;
         /** Stat for the ratio between BTB hits and BTB lookups. */
-        Stats::Formula BTBHitRatio;
+        statistics::Formula BTBHitRatio;
         /** Stat for number of times the RAS is used to get a target. */
-        Stats::Scalar RASUsed;
+        statistics::Scalar RASUsed;
         /** Stat for number of times the RAS is incorrect. */
-        Stats::Scalar RASIncorrect;
+        statistics::Scalar RASIncorrect;
 
         /** Stat for the number of indirect target lookups.*/
-        Stats::Scalar indirectLookups;
+        statistics::Scalar indirectLookups;
         /** Stat for the number of indirect target hits.*/
-        Stats::Scalar indirectHits;
+        statistics::Scalar indirectHits;
         /** Stat for the number of indirect target misses.*/
-        Stats::Scalar indirectMisses;
+        statistics::Scalar indirectMisses;
         /** Stat for the number of indirect target mispredictions.*/
-        Stats::Scalar indirectMispredicted;
+        statistics::Scalar indirectMispredicted;
     } stats;
 
   protected:
@@ -323,7 +331,7 @@ class BPredUnit : public SimObject
      * @param name Name of the probe point.
      * @return A unique_ptr to the new probe point.
      */
-    ProbePoints::PMUUPtr pmuProbePoint(const char *name);
+    probing::PMUUPtr pmuProbePoint(const char *name);
 
 
     /**
@@ -331,12 +339,15 @@ class BPredUnit : public SimObject
      *
      * @note This counter includes speculative branches.
      */
-    ProbePoints::PMUUPtr ppBranches;
+    probing::PMUUPtr ppBranches;
 
     /** Miss-predicted branches */
-    ProbePoints::PMUUPtr ppMisses;
+    probing::PMUUPtr ppMisses;
 
     /** @} */
 };
+
+} // namespace branch_prediction
+} // namespace gem5
 
 #endif // __CPU_PRED_BPRED_UNIT_HH__

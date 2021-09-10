@@ -42,7 +42,7 @@
 #ifndef __CPU_EXEC_CONTEXT_HH__
 #define __CPU_EXEC_CONTEXT_HH__
 
-#include "arch/registers.hh"
+#include "arch/vecregs.hh"
 #include "base/types.hh"
 #include "config/the_isa.hh"
 #include "cpu/base.hh"
@@ -50,6 +50,9 @@
 #include "cpu/static_inst_fwd.hh"
 #include "cpu/translation.hh"
 #include "mem/request.hh"
+
+namespace gem5
+{
 
 /**
  * The ExecContext is an abstract base class the provides the
@@ -115,36 +118,6 @@ class ExecContext
     /** Sets a destination vector register operand to a value. */
     virtual void setVecRegOperand(const StaticInst *si, int idx,
             const TheISA::VecRegContainer& val) = 0;
-    /** @} */
-
-    /** Vector Register Lane Interfaces. */
-    /** @{ */
-    /** Reads source vector 8bit operand. */
-    virtual ConstVecLane8 readVec8BitLaneOperand(
-            const StaticInst *si, int idx) const = 0;
-
-    /** Reads source vector 16bit operand. */
-    virtual ConstVecLane16 readVec16BitLaneOperand(
-            const StaticInst *si, int idx) const = 0;
-
-    /** Reads source vector 32bit operand. */
-    virtual ConstVecLane32 readVec32BitLaneOperand(
-            const StaticInst *si, int idx) const = 0;
-
-    /** Reads source vector 64bit operand. */
-    virtual ConstVecLane64 readVec64BitLaneOperand(
-            const StaticInst *si, int idx) const = 0;
-
-    /** Write a lane of the destination vector operand. */
-    /** @{ */
-    virtual void setVecLaneOperand(const StaticInst *si, int idx,
-            const LaneData<LaneSize::Byte>& val) = 0;
-    virtual void setVecLaneOperand(const StaticInst *si, int idx,
-            const LaneData<LaneSize::TwoByte>& val) = 0;
-    virtual void setVecLaneOperand(const StaticInst *si, int idx,
-            const LaneData<LaneSize::FourByte>& val) = 0;
-    virtual void setVecLaneOperand(const StaticInst *si, int idx,
-            const LaneData<LaneSize::EightByte>& val) = 0;
     /** @} */
 
     /** Vector Elem Interfaces. */
@@ -329,5 +302,7 @@ class ExecContext
 
     /** @} */
 };
+
+} // namespace gem5
 
 #endif // __CPU_EXEC_CONTEXT_HH__

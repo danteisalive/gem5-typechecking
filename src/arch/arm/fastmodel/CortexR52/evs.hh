@@ -49,7 +49,11 @@
 #include "systemc/ext/core/sc_module.hh"
 #include "systemc/tlm_port_wrapper.hh"
 
-namespace FastModel
+namespace gem5
+{
+
+GEM5_DEPRECATED_NAMESPACE(FastModel, fastmodel);
+namespace fastmodel
 {
 
 class CortexR52Cluster;
@@ -181,6 +185,7 @@ struct ScxEvsCortexR52x4Types
 using ScxEvsCortexR52x4 = ScxEvsCortexR52<ScxEvsCortexR52x4Types>;
 extern template class ScxEvsCortexR52<ScxEvsCortexR52x4Types>;
 
-} // namespace FastModel
+} // namespace fastmodel
+} // namespace gem5
 
 #endif // __ARCH_ARM_FASTMODEL_CORTEXR52_EVS_HH__

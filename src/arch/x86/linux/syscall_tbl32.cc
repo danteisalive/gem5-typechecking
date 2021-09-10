@@ -32,6 +32,9 @@
 #include "arch/x86/linux/syscalls.hh"
 #include "sim/syscall_emul.hh"
 
+namespace gem5
+{
+
 namespace X86ISA
 {
 
@@ -261,7 +264,11 @@ SyscallDescTable<EmuLinux::SyscallABI32> EmuLinux::syscallDescs32 = {
     { 218, "mincore" },
     { 219, "madvise", ignoreFunc },
     { 220, "madvise1" },
+#if defined(SYS_getdents64)
+    { 221, "getdents64", getdents64Func },
+#else
     { 221, "getdents64" },
+#endif
     { 222, "fcntl64" },
     { 223, "unused" },
     { 224, "gettid", gettidFunc },
@@ -367,3 +374,4 @@ SyscallDescTable<EmuLinux::SyscallABI32> EmuLinux::syscallDescs32 = {
 };
 
 } // namespace X86ISA
+} // namespace gem5

@@ -133,7 +133,7 @@ class Template(object):
             if operands.predRead:
                 myDict['op_decl'] += 'uint8_t _sourceIndex = 0;\n'
             if operands.predWrite:
-                myDict['op_decl'] += 'M5_VAR_USED uint8_t _destIndex = 0;\n'
+                myDict['op_decl'] += 'GEM5_VAR_USED uint8_t _destIndex = 0;\n'
 
             is_src = lambda op: op.is_src
             is_dest = lambda op: op.is_dest
@@ -606,8 +606,10 @@ class ISAParser(Grammar):
 
             fn = 'decoder-ns.hh.inc'
             assert(fn in self.files)
-            f.write('namespace %s {\n#include "%s"\n}\n'
-                    % (self.namespace, fn))
+            f.write('namespace gem5\n{\n')
+            f.write('namespace %s {\n#include "%s"\n} // namespace %s\n'
+                    % (self.namespace, fn, self.namespace))
+            f.write('} // namespace gem5')
             f.write('\n#endif  // __ARCH_%s_GENERATED_DECODER_HH__\n' %
                     self.isa_name.upper())
 
@@ -648,11 +650,13 @@ class ISAParser(Grammar):
 
                 fn = 'decoder-ns.cc.inc'
                 assert(fn in self.files)
+                print('namespace gem5\n{\n', file=f)
                 print('namespace %s {' % self.namespace, file=f)
                 if splits > 1:
                     print('#define __SPLIT %u' % i, file=f)
                 print('#include "%s"' % fn, file=f)
-                print('}', file=f)
+                print('} // namespace %s' % self.namespace, file=f)
+                print('} // namespace gem5', file=f)
 
         # instruction execution
         splits = self.splits[self.get_file('exec')]
@@ -669,11 +673,13 @@ class ISAParser(Grammar):
 
                 fn = 'exec-ns.cc.inc'
                 assert(fn in self.files)
+                print('namespace gem5\n{\n', file=f)
                 print('namespace %s {' % self.namespace, file=f)
                 if splits > 1:
                     print('#define __SPLIT %u' % i, file=f)
                 print('#include "%s"' % fn, file=f)
-                print('}', file=f)
+                print('} // namespace %s' % self.namespace, file=f)
+                print('} // namespace gem5', file=f)
 
     scaremonger_template ='''// DO NOT EDIT
 // This file was automatically generated from an ISA description:
@@ -1152,6 +1158,7 @@ del wrap
         'top_level_decode_block : decode_block'
         codeObj = t[1]
         codeObj.wrap_decode_block('''
+using namespace gem5;
 StaticInstPtr
 %(isa_name)s::Decoder::decodeInst(%(isa_name)s::ExtMachInst machInst)
 {
@@ -1257,7 +1264,7 @@ StaticInstPtr
         # just wrap the decoding code from the block as a case in the
         # outer switch statement.
         codeObj.wrap_decode_block('\n%s\n' % ''.join(case_list),
-                                  'M5_UNREACHABLE;\n')
+                                  'GEM5_UNREACHABLE;\n')
         codeObj.has_decode_default = (case_list == ['default:'])
         t[0] = codeObj
 
@@ -1280,7 +1287,7 @@ StaticInstPtr
 
     def prep_int_lit_case_label(self, lit):
         if lit >= 2**32:
-            return 'case ULL(%#x): ' % lit
+            return 'case %#xULL: ' % lit
         else:
             return 'case %#x: ' % lit
 

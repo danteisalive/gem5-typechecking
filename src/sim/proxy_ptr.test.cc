@@ -31,6 +31,8 @@
 
 #include "sim/proxy_ptr.hh"
 
+using namespace gem5;
+
 struct Access
 {
     bool read;
@@ -163,7 +165,7 @@ class TestProxy
     BackingStore &store;
 
     TestProxy(BackingStore &_store) : store(_store) {}
-    // Sneaky constructor for testing GuestABI integration.
+    // Sneaky constructor for testing guest_abi integration.
     TestProxy(ThreadContext *tc) : store(*(BackingStore *)tc) {}
 
     void
@@ -469,7 +471,11 @@ struct TestABI
     using State = int;
 };
 
-namespace GuestABI
+namespace gem5
+{
+
+GEM5_DEPRECATED_NAMESPACE(GuestABI, guest_abi);
+namespace guest_abi
 {
 
 template <>
@@ -482,7 +488,8 @@ struct Argument<TestABI, Addr>
     }
 };
 
-}
+} // namespace guest_abi
+} // namespace gem5
 
 bool abiCalled = false;
 bool abiCalledConst = false;
@@ -501,7 +508,7 @@ abiTestFuncConst(ThreadContext *tc, ConstTestPtr<uint8_t> ptr)
     EXPECT_EQ(ptr.addr(), 0x1000);
 }
 
-TEST(ProxyPtr, GuestABI)
+TEST(ProxyPtrTest, GuestABI)
 {
     BackingStore store(0x1000, 0x1000);
 

@@ -137,7 +137,9 @@
 
 #include "arch/riscv/mmu.hh"
 #include "arch/riscv/pagetable_walker.hh"
-#include "arch/riscv/registers.hh"
+#include "arch/riscv/regs/float.hh"
+#include "arch/riscv/regs/int.hh"
+#include "arch/riscv/regs/misc.hh"
 #include "arch/riscv/tlb.hh"
 #include "blobs/gdb_xml_riscv_cpu.hh"
 #include "blobs/gdb_xml_riscv_csr.hh"
@@ -148,10 +150,13 @@
 #include "mem/page_table.hh"
 #include "sim/full_system.hh"
 
+namespace gem5
+{
+
 using namespace RiscvISA;
 
-RemoteGDB::RemoteGDB(System *_system, ThreadContext *tc, int _port)
-    : BaseRemoteGDB(_system, tc, _port), regCache(this)
+RemoteGDB::RemoteGDB(System *_system, int _port)
+    : BaseRemoteGDB(_system, _port), regCache(this)
 {
 }
 
@@ -164,13 +169,13 @@ RemoteGDB::acc(Addr va, size_t len)
         unsigned logBytes;
         Addr paddr = va;
 
-        PrivilegeMode pmode = mmu->getMemPriv(context(), BaseTLB::Read);
+        PrivilegeMode pmode = mmu->getMemPriv(context(), BaseMMU::Read);
         SATP satp = context()->readMiscReg(MISCREG_SATP);
         if (pmode != PrivilegeMode::PRV_M &&
             satp.mode != AddrXlateMode::BARE) {
             Walker *walker = mmu->getDataWalker();
             Fault fault = walker->startFunctional(
-                context(), paddr, logBytes, BaseTLB::Read);
+                context(), paddr, logBytes, BaseMMU::Read);
             if (fault != NoFault)
                 return false;
         }
@@ -486,3 +491,5 @@ RemoteGDB::gdbRegs()
 {
     return &regCache;
 }
+
+} // namespace gem5

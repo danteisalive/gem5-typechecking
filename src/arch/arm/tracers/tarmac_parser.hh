@@ -49,7 +49,6 @@
 #include <fstream>
 #include <unordered_map>
 
-#include "arch/arm/registers.hh"
 #include "base/trace.hh"
 #include "base/types.hh"
 #include "cpu/static_inst.hh"
@@ -58,6 +57,9 @@
 #include "params/TarmacParser.hh"
 #include "sim/insttracer.hh"
 #include "tarmac_base.hh"
+
+namespace gem5
+{
 
 namespace Trace {
 
@@ -296,5 +298,6 @@ class TarmacParser : public InstTracer
 };
 
 } // namespace Trace
+} // namespace gem5
 
 #endif // __ARCH_ARM_TRACERS_TARMAC_PARSER_HH__

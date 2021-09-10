@@ -58,7 +58,6 @@
 #include "config/have_protobuf.hh"
 #include "python/pybind11/pybind.hh"
 #include "sim/async.hh"
-#include "sim/core.hh"
 
 #if HAVE_PROTOBUF
 #include <google/protobuf/stubs/common.h>
@@ -66,6 +65,9 @@
 #endif
 
 namespace py = pybind11;
+
+namespace gem5
+{
 
 // The python library is totally messed up with respect to constness,
 // so make a simple macro to make life a little easier
@@ -245,7 +247,7 @@ registerNativeModules()
  * Make the commands array weak so that they can be overridden (used
  * by unit tests to specify a different python main function.
  */
-M5_WEAK const char *m5MainCommands[] = {
+GEM5_WEAK const char *m5MainCommands[] = {
     "import m5",
     "m5.main()",
     0 // sentinel is required
@@ -313,3 +315,5 @@ m5Main(int argc, char **_argv)
 
     return 0;
 }
+
+} // namespace gem5

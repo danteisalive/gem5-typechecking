@@ -34,21 +34,17 @@
 #ifndef __ARCH_RISCV_ISA_HH__
 #define __ARCH_RISCV_ISA_HH__
 
-#include <map>
-#include <string>
+#include <vector>
 
 #include "arch/generic/isa.hh"
-#include "arch/riscv/registers.hh"
 #include "arch/riscv/types.hh"
-#include "base/bitfield.hh"
-#include "base/logging.hh"
-#include "cpu/reg_class.hh"
-#include "sim/sim_object.hh"
+#include "base/types.hh"
+
+namespace gem5
+{
 
 struct RiscvISAParams;
-class ThreadContext;
 class Checkpoint;
-class EventManager;
 
 namespace RiscvISA
 {
@@ -96,6 +92,7 @@ class ISA : public BaseISA
     int flattenMiscIndex(int reg) const { return reg; }
 
     bool inUserMode() const override { return true; }
+    void copyRegsFrom(ThreadContext *src) override;
 
     void serialize(CheckpointOut &cp) const override;
     void unserialize(CheckpointIn &cp) override;
@@ -104,5 +101,6 @@ class ISA : public BaseISA
 };
 
 } // namespace RiscvISA
+} // namespace gem5
 
 #endif // __ARCH_RISCV_ISA_HH__

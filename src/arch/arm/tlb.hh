@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010-2013, 2016, 2019-2020 ARM Limited
+ * Copyright (c) 2010-2013, 2016, 2019-2021 Arm Limited
  * All rights reserved
  *
  * The license below extends only to copyright in the software and shall
@@ -43,7 +43,6 @@
 
 
 #include "arch/arm/faults.hh"
-#include "arch/arm/isa_traits.hh"
 #include "arch/arm/pagetable.hh"
 #include "arch/arm/utility.hh"
 #include "arch/generic/tlb.hh"
@@ -52,13 +51,15 @@
 #include "params/ArmTLB.hh"
 #include "sim/probe/pmu.hh"
 
+namespace gem5
+{
+
 class ThreadContext;
 
 namespace ArmISA {
 
 class TableWalker;
 class Stage2LookUp;
-class Stage2MMU;
 class TLB;
 
 class TLBIALL;
@@ -68,7 +69,6 @@ class TLBIALLN;
 class TLBIMVA;
 class TLBIASID;
 class TLBIMVAA;
-class TLBIIPA;
 
 class TlbTestInterface
 {
@@ -85,7 +85,7 @@ class TlbTestInterface
      * @param domain Domain type
      */
     virtual Fault translationCheck(const RequestPtr &req, bool is_priv,
-                                   BaseTLB::Mode mode,
+                                   BaseMMU::Mode mode,
                                    TlbEntry::DomainType domain) = 0;
 
     /**
@@ -101,7 +101,7 @@ class TlbTestInterface
      * @param lookup_level Page table walker level
      */
     virtual Fault walkCheck(Addr pa, Addr size, Addr va, bool is_secure,
-                            Addr is_priv, BaseTLB::Mode mode,
+                            Addr is_priv, BaseMMU::Mode mode,
                             TlbEntry::DomainType domain,
                             LookupLevel lookup_level) = 0;
 };
@@ -109,7 +109,8 @@ class TlbTestInterface
 class TLB : public BaseTLB
 {
   public:
-    enum ArmFlags {
+    enum ArmFlags
+    {
         AlignmentMask = 0x7,
 
         AlignByte = 0x0,
@@ -124,7 +125,8 @@ class TLB : public BaseTLB
         UserMode = 0x10
     };
 
-    enum ArmTranslationType {
+    enum ArmTranslationType
+    {
         NormalTran = 0,
         S1CTran = 0x1,
         HypMode = 0x2,
@@ -165,41 +167,40 @@ class TLB : public BaseTLB
 
     TableWalker *tableWalker;
     TLB *stage2Tlb;
-    Stage2MMU *stage2Mmu;
 
     TlbTestInterface *test;
 
-    struct TlbStats : public Stats::Group
+    struct TlbStats : public statistics::Group
     {
-        TlbStats(Stats::Group *parent);
+        TlbStats(statistics::Group *parent);
         // Access Stats
-        mutable Stats::Scalar instHits;
-        mutable Stats::Scalar instMisses;
-        mutable Stats::Scalar readHits;
-        mutable Stats::Scalar readMisses;
-        mutable Stats::Scalar writeHits;
-        mutable Stats::Scalar writeMisses;
-        mutable Stats::Scalar inserts;
-        mutable Stats::Scalar flushTlb;
-        mutable Stats::Scalar flushTlbMva;
-        mutable Stats::Scalar flushTlbMvaAsid;
-        mutable Stats::Scalar flushTlbAsid;
-        mutable Stats::Scalar flushedEntries;
-        mutable Stats::Scalar alignFaults;
-        mutable Stats::Scalar prefetchFaults;
-        mutable Stats::Scalar domainFaults;
-        mutable Stats::Scalar permsFaults;
+        mutable statistics::Scalar instHits;
+        mutable statistics::Scalar instMisses;
+        mutable statistics::Scalar readHits;
+        mutable statistics::Scalar readMisses;
+        mutable statistics::Scalar writeHits;
+        mutable statistics::Scalar writeMisses;
+        mutable statistics::Scalar inserts;
+        mutable statistics::Scalar flushTlb;
+        mutable statistics::Scalar flushTlbMva;
+        mutable statistics::Scalar flushTlbMvaAsid;
+        mutable statistics::Scalar flushTlbAsid;
+        mutable statistics::Scalar flushedEntries;
+        mutable statistics::Scalar alignFaults;
+        mutable statistics::Scalar prefetchFaults;
+        mutable statistics::Scalar domainFaults;
+        mutable statistics::Scalar permsFaults;
 
-        Stats::Formula readAccesses;
-        Stats::Formula writeAccesses;
-        Stats::Formula instAccesses;
-        Stats::Formula hits;
-        Stats::Formula misses;
-        Stats::Formula accesses;
+        statistics::Formula readAccesses;
+        statistics::Formula writeAccesses;
+        statistics::Formula instAccesses;
+        statistics::Formula hits;
+        statistics::Formula misses;
+        statistics::Formula accesses;
     } stats;
 
     /** PMU probe for TLB refills */
-    ProbePoints::PMUUPtr ppRefills;
+    probing::PMUUPtr ppRefills;
 
     int rangeMRU; //On lookup, only move entries ahead when outside rangeMRU
 
@@ -216,45 +217,49 @@ class TLB : public BaseTLB
      * @param hyp if the lookup is done from hyp mode
      * @param functional if the lookup should modify state
      * @param ignore_asn if on lookup asn should be ignored
+     * @param target_el selecting the translation regime
+     * @param in_host if we are in host (EL2&0 regime)
+     * @param mode to differentiate between read/writes/fetches.
      * @return pointer to TLB entry if it exists
      */
-    TlbEntry *lookup(Addr vpn, uint16_t asn, uint8_t vmid, bool hyp,
+    TlbEntry *lookup(Addr vpn, uint16_t asn, vmid_t vmid, bool hyp,
                      bool secure, bool functional,
                      bool ignore_asn, ExceptionLevel target_el,
-                     bool in_host);
+                     bool in_host, BaseMMU::Mode mode);
 
     virtual ~TLB();
 
     void takeOverFrom(BaseTLB *otlb) override;
 
-    /// setup all the back pointers
-    void init() override;
-
     void setTestInterface(SimObject *ti);
 
-    TableWalker *getTableWalker() { return tableWalker; }
+    void setStage2Tlb(TLB *stage2_tlb) { stage2Tlb = stage2_tlb; }
 
-    void setMMU(Stage2MMU *m, RequestorID requestor_id);
+    void setTableWalker(TableWalker *table_walker);
+
+    TableWalker *getTableWalker() { return tableWalker; }
 
     int getsize() const { return size; }
 
     void insert(Addr vaddr, TlbEntry &pte);
 
     Fault getTE(TlbEntry **te, const RequestPtr &req,
-                ThreadContext *tc, Mode mode,
-                Translation *translation, bool timing, bool functional,
+                ThreadContext *tc, BaseMMU::Mode mode,
+                BaseMMU::Translation *translation,
+                bool timing, bool functional,
                 bool is_secure, ArmTranslationType tranType);
 
     Fault getResultTe(TlbEntry **te, const RequestPtr &req,
-                      ThreadContext *tc, Mode mode,
-                      Translation *translation, bool timing,
+                      ThreadContext *tc, BaseMMU::Mode mode,
+                      BaseMMU::Translation *translation, bool timing,
                       bool functional, TlbEntry *mergeTe);
 
-    Fault checkPermissions(TlbEntry *te, const RequestPtr &req, Mode mode);
-    Fault checkPermissions64(TlbEntry *te, const RequestPtr &req, Mode mode,
-                             ThreadContext *tc);
+    Fault checkPermissions(TlbEntry *te, const RequestPtr &req,
+                           BaseMMU::Mode mode);
+    Fault checkPermissions64(TlbEntry *te, const RequestPtr &req,
+                             BaseMMU::Mode mode, ThreadContext *tc);
     bool checkPAN(ThreadContext *tc, uint8_t ap, const RequestPtr &req,
-                  Mode mode);
+                  BaseMMU::Mode mode, const bool is_priv);
 
     /** Reset the entire TLB. Used for CPU switching to prevent stale
      * translations after multiple switches
@@ -293,13 +298,7 @@ class TLB : public BaseTLB
      */
     void flush(const TLBIMVAA &tlbi_op);
 
-    /**
-     * Invalidate all entries in the stage 2 TLB that match the given ipa
-     * and the current VMID
-     */
-    void flush(const TLBIIPA &tlbi_op);
-
-    Fault trickBoxCheck(const RequestPtr &req, Mode mode,
+    Fault trickBoxCheck(const RequestPtr &req, BaseMMU::Mode mode,
                         TlbEntry::DomainType domain);
 
     Fault walkTrickBoxCheck(Addr pa, bool is_secure, Addr va, Addr sz,
@@ -330,10 +329,10 @@ class TLB : public BaseTLB
      * behaves like a normal lookup without modifying any page table state.
      */
     Fault translateFunctional(const RequestPtr &req, ThreadContext *tc,
-            Mode mode, ArmTranslationType tranType);
+            BaseMMU::Mode mode, ArmTranslationType tranType);
     Fault
     translateFunctional(const RequestPtr &req,
-                        ThreadContext *tc, Mode mode) override
+                        ThreadContext *tc, BaseMMU::Mode mode) override
     {
         return translateFunctional(req, tc, mode, NormalTran);
     }
@@ -352,41 +351,48 @@ class TLB : public BaseTLB
         return _attr;
     }
 
-    Fault translateMmuOff(ThreadContext *tc, const RequestPtr &req, Mode mode,
-        TLB::ArmTranslationType tranType, Addr vaddr, bool long_desc_format);
-    Fault translateMmuOn(ThreadContext *tc, const RequestPtr &req, Mode mode,
-        Translation *translation, bool &delay, bool timing, bool functional,
+    Fault translateMmuOff(ThreadContext *tc, const RequestPtr &req,
+        BaseMMU::Mode mode, TLB::ArmTranslationType tranType,
+        Addr vaddr, bool long_desc_format);
+    Fault translateMmuOn(ThreadContext *tc, const RequestPtr &req,
+        BaseMMU::Mode mode, BaseMMU::Translation *translation, bool &delay,
+        bool timing, bool functional,
         Addr vaddr, ArmFault::TranMethod tranMethod);
 
-    Fault translateFs(const RequestPtr &req, ThreadContext *tc, Mode mode,
-            Translation *translation, bool &delay,
-            bool timing, ArmTranslationType tranType, bool functional = false);
-    Fault translateSe(const RequestPtr &req, ThreadContext *tc, Mode mode,
-            Translation *translation, bool &delay, bool timing);
-    Fault translateAtomic(const RequestPtr &req, ThreadContext *tc, Mode mode,
-            ArmTranslationType tranType);
+    Fault translateFs(const RequestPtr &req, ThreadContext *tc,
+        BaseMMU::Mode mode, BaseMMU::Translation *translation,
+        bool &delay, bool timing, ArmTranslationType tranType,
+        bool functional = false);
+    Fault translateSe(const RequestPtr &req, ThreadContext *tc,
+        BaseMMU::Mode mode, BaseMMU::Translation *translation,
+        bool &delay, bool timing);
+
+    Fault translateAtomic(const RequestPtr &req, ThreadContext *tc,
+        BaseMMU::Mode mode, ArmTranslationType tranType);
+
     Fault
     translateAtomic(const RequestPtr &req,
-                    ThreadContext *tc, Mode mode) override
+                    ThreadContext *tc, BaseMMU::Mode mode) override
     {
         return translateAtomic(req, tc, mode, NormalTran);
     }
     void translateTiming(
             const RequestPtr &req, ThreadContext *tc,
-            Translation *translation, Mode mode,
+            BaseMMU::Translation *translation, BaseMMU::Mode mode,
             ArmTranslationType tranType);
     void
     translateTiming(const RequestPtr &req, ThreadContext *tc,
-                    Translation *translation, Mode mode) override
+                    BaseMMU::Translation *translation,
+                    BaseMMU::Mode mode) override
     {
         translateTiming(req, tc, translation, mode, NormalTran);
     }
     Fault translateComplete(const RequestPtr &req, ThreadContext *tc,
-            Translation *translation, Mode mode, ArmTranslationType tranType,
-            bool callFromS2);
+        BaseMMU::Translation *translation, BaseMMU::Mode mode,
+        ArmTranslationType tranType, bool callFromS2);
     Fault finalizePhysical(
-            const RequestPtr &req,
-            ThreadContext *tc, Mode mode) const override;
+        const RequestPtr &req,
+        ThreadContext *tc, BaseMMU::Mode mode) const override;
 
     void drainResume() override;
 
@@ -419,7 +425,7 @@ protected:
     bool isHyp;
     TTBCR ttbcr;
     uint16_t asid;
-    uint8_t vmid;
+    vmid_t vmid;
     PRRR prrr;
     NMRR nmrr;
     HCR hcr;
@@ -439,6 +445,10 @@ protected:
     void updateMiscReg(ThreadContext *tc,
                        ArmTranslationType tranType = NormalTran);
 
+    /** Returns the current VMID
+     * (information stored in the VTTBR_EL2 register) */
+    vmid_t getVMID(ThreadContext *tc) const;
+
 public:
     void invalidateMiscReg() { miscRegValid = false; }
 
@@ -455,13 +465,15 @@ private:
                    bool in_host);
 
   public: /* Testing */
-    Fault testTranslation(const RequestPtr &req, Mode mode,
-                          TlbEntry::DomainType domain);
-    Fault testWalk(Addr pa, Addr size, Addr va, bool is_secure, Mode mode,
-                   TlbEntry::DomainType domain,
-                   LookupLevel lookup_level);
+    Fault testTranslation(const RequestPtr &req, BaseMMU::Mode mode,
+        TlbEntry::DomainType domain);
+
+    Fault testWalk(Addr pa, Addr size, Addr va, bool is_secure,
+        BaseMMU::Mode mode, TlbEntry::DomainType domain,
+        LookupLevel lookup_level);
 };
 
 } // namespace ArmISA
+} // namespace gem5
 
 #endif // __ARCH_ARM_TLB_HH__

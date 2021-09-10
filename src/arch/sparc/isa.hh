@@ -33,10 +33,15 @@
 #include <string>
 
 #include "arch/generic/isa.hh"
-#include "arch/sparc/registers.hh"
+#include "arch/sparc/regs/int.hh"
+#include "arch/sparc/regs/misc.hh"
+#include "arch/sparc/sparc_traits.hh"
 #include "arch/sparc/types.hh"
 #include "cpu/reg_class.hh"
 #include "sim/sim_object.hh"
+
+namespace gem5
+{
 
 class Checkpoint;
 class EventManager;
@@ -143,7 +148,8 @@ class ISA : public BaseISA
     static const int RegsPerWindow = NumWindowedRegs - WindowOverlap;
     static const int TotalWindowed = NWindows * RegsPerWindow;
 
-    enum InstIntRegOffsets {
+    enum InstIntRegOffsets
+    {
         CurrentGlobalsOffset = 0,
         CurrentWindowOffset = CurrentGlobalsOffset + NumGlobalRegs,
         MicroIntOffset = CurrentWindowOffset + NumWindowedRegs,
@@ -231,8 +237,12 @@ class ISA : public BaseISA
         return !(pstate.priv || hpstate.hpriv);
     }
 
+    void copyRegsFrom(ThreadContext *src) override;
+
     ISA(const Params &p);
 };
-}
+
+} // namespace SparcISA
+} // namespace gem5
 
 #endif

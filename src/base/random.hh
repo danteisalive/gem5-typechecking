@@ -53,16 +53,20 @@
 #include "base/types.hh"
 #include "sim/serialize.hh"
 
+namespace gem5
+{
+
 class Checkpoint;
 
 class Random : public Serializable
 {
 
-  private:
-
-    std::mt19937_64 gen;
-
   public:
+
+    /**
+     * @ingroup api_base_utils
+     */
+    std::mt19937_64 gen;
 
     /**
      * @ingroup api_base_utils
@@ -120,5 +124,7 @@ class Random : public Serializable
  * @ingroup api_base_utils
  */
 extern Random random_mt;
+
+} // namespace gem5
 
 #endif // __BASE_RANDOM_HH__

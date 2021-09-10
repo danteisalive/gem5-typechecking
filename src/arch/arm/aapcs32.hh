@@ -33,13 +33,16 @@
 #include <type_traits>
 #include <utility>
 
-#include "arch/arm/intregs.hh"
+#include "arch/arm/regs/int.hh"
 #include "arch/arm/utility.hh"
 #include "base/intmath.hh"
 #include "cpu/thread_context.hh"
 #include "mem/port_proxy.hh"
 #include "sim/guest_abi.hh"
 #include "sim/proxy_ptr.hh"
+
+namespace gem5
+{
 
 class ThreadContext;
 
@@ -63,7 +66,8 @@ struct Aapcs32
     };
 };
 
-namespace GuestABI
+GEM5_DEPRECATED_NAMESPACE(GuestABI, guest_abi);
+namespace guest_abi
 {
 
 /*
@@ -355,7 +359,7 @@ struct Argument<Aapcs32, Composite, typename std::enable_if_t<
     }
 };
 
-} // namespace GuestABI
+} // namespace guest_abi
 
 
 /*
@@ -426,7 +430,8 @@ struct Aapcs32Vfp : public Aapcs32
     };
 };
 
-namespace GuestABI
+GEM5_DEPRECATED_NAMESPACE(GuestABI, guest_abi);
+namespace guest_abi
 {
 
 /*
@@ -463,7 +468,7 @@ struct Result<Aapcs32Vfp, Float, typename std::enable_if_t<
 
         RegId id(VecRegClass, 0);
         auto reg = tc->readVecReg(id);
-        reg.laneView<Float, 0>() = f;
+        reg.as<Float>()[0] = f;
         tc->setVecReg(id, reg);
     };
 };
@@ -487,7 +492,7 @@ struct Argument<Aapcs32Vfp, Float, typename std::enable_if_t<
 
             RegId id(VecRegClass, reg);
             auto val = tc->readVecReg(id);
-            return val.laneView<Float>(lane);
+            return val.as<Float>()[lane];
         }
 
         return loadFromStack<Float>(tc, state);
@@ -558,7 +563,7 @@ struct Argument<Aapcs32Vfp, HA, typename std::enable_if_t<
 
                 RegId id(VecRegClass, reg);
                 auto val = tc->readVecReg(id);
-                ha[i] = val.laneView<Elem>(lane);
+                ha[i] = val.as<Elem>()[lane];
             }
             return ha;
         }
@@ -605,7 +610,7 @@ struct Result<Aapcs32Vfp, HA,
 
             RegId id(VecRegClass, reg);
             auto val = tc->readVecReg(id);
-            val.laneView<Elem>(lane) = ha[i];
+            val.as<Elem>()[lane] = ha[i];
             tc->setVecReg(id, val);
         }
     }
@@ -634,6 +639,7 @@ struct Argument<Aapcs32Vfp, VarArgs<Types...>>
     }
 };
 
-} // namespace GuestABI
+} // namespace guest_abi
+} // namespace gem5
 
 #endif // __ARCH_ARM_AAPCS32_HH__

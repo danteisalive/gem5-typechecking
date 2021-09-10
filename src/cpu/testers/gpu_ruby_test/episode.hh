@@ -38,6 +38,9 @@
 
 #include "cpu/testers/gpu_ruby_test/address_manager.hh"
 
+namespace gem5
+{
+
 class ProtocolTester;
 class TesterThread;
 
@@ -47,9 +50,11 @@ class Episode
     typedef AddressManager::Location Location;
     typedef AddressManager::Value Value;
 
-    class Action {
+    class Action
+    {
       public:
-        enum class Type {
+        enum class Type
+        {
             ACQUIRE,
             RELEASE,
             ATOMIC,
@@ -122,5 +127,7 @@ class Episode
     // randomly generate actions in this episode
     void initActions();
 };
+
+} // namespace gem5
 
 #endif /* CPU_TESTERS_PROTOCOL_TESTER_EPISODE_HH_ */

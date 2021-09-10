@@ -31,8 +31,9 @@
 
 #include "arch/riscv/faults.hh"
 
+#include "arch/riscv/insts/static_inst.hh"
 #include "arch/riscv/isa.hh"
-#include "arch/riscv/registers.hh"
+#include "arch/riscv/regs/misc.hh"
 #include "arch/riscv/utility.hh"
 #include "cpu/base.hh"
 #include "cpu/thread_context.hh"
@@ -40,6 +41,9 @@
 #include "sim/debug.hh"
 #include "sim/full_system.hh"
 #include "sim/workload.hh"
+
+namespace gem5
+{
 
 namespace RiscvISA
 {
@@ -140,7 +144,7 @@ RiscvFault::invoke(ThreadContext *tc, const StaticInstPtr &inst)
         pcState.set(addr);
     } else {
         invokeSE(tc, inst);
-        advancePC(pcState, inst);
+        inst->advancePC(pcState);
     }
     tc->pcState(pcState);
 }
@@ -163,14 +167,16 @@ void Reset::invoke(ThreadContext *tc, const StaticInstPtr &inst)
 void
 UnknownInstFault::invokeSE(ThreadContext *tc, const StaticInstPtr &inst)
 {
-    panic("Unknown instruction 0x%08x at pc 0x%016llx", inst->machInst,
+    auto *rsi = static_cast<RiscvStaticInst *>(inst.get());
+    panic("Unknown instruction 0x%08x at pc 0x%016llx", rsi->machInst,
         tc->pcState().pc());
 }
 
 void
 IllegalInstFault::invokeSE(ThreadContext *tc, const StaticInstPtr &inst)
 {
-    panic("Illegal instruction 0x%08x at pc 0x%016llx: %s", inst->machInst,
+    auto *rsi = static_cast<RiscvStaticInst *>(inst.get());
+    panic("Illegal instruction 0x%08x at pc 0x%016llx: %s", rsi->machInst,
         tc->pcState().pc(), reason.c_str());
 }
 
@@ -202,3 +208,4 @@ SyscallFault::invokeSE(ThreadContext *tc, const StaticInstPtr &inst)
 }
 
 } // namespace RiscvISA
+} // namespace gem5

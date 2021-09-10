@@ -44,6 +44,9 @@
 #include "gpu-compute/wavefront.hh"
 #include "mem/ruby/system/RubySystem.hh"
 
+namespace gem5
+{
+
 uint32_t FetchUnit::globalFetchUnitID;
 
 FetchUnit::FetchUnit(const ComputeUnitParams &p, ComputeUnit &cu)
@@ -143,7 +146,7 @@ FetchUnit::initiateFetch(Wavefront *wavefront)
     Addr vaddr = fetchBuf.at(wavefront->wfSlotId).nextFetchAddr();
 
     // this should already be aligned to a cache line
-    assert(vaddr == makeLineAddress(vaddr,
+    assert(vaddr == ruby::makeLineAddress(vaddr,
            computeUnit.getCacheLineBits()));
 
     // shouldn't be fetching a line that is already buffered
@@ -171,7 +174,7 @@ FetchUnit::initiateFetch(Wavefront *wavefront)
 
         // Sender State needed by TLB hierarchy
         pkt->senderState =
-            new TheISA::GpuTLB::TranslationState(BaseTLB::Execute,
+            new TheISA::GpuTLB::TranslationState(BaseMMU::Execute,
                                                  computeUnit.shader->gpuTc,
                                                  false, pkt->senderState);
 
@@ -198,7 +201,7 @@ FetchUnit::initiateFetch(Wavefront *wavefront)
         }
     } else {
         pkt->senderState =
-            new TheISA::GpuTLB::TranslationState(BaseTLB::Execute,
+            new TheISA::GpuTLB::TranslationState(BaseMMU::Execute,
                                                  computeUnit.shader->gpuTc);
 
         computeUnit.sqcTLBPort.sendFunctional(pkt);
@@ -397,7 +400,7 @@ FetchUnit::FetchBufDesc::nextFetchAddr()
          * beginning of a cache line, so we adjust the readPtr by
          * the current PC's offset from the start of the line.
          */
-        next_line = makeLineAddress(wavefront->pc(), cacheLineBits);
+        next_line = ruby::makeLineAddress(wavefront->pc(), cacheLineBits);
         readPtr = bufStart;
 
         /**
@@ -409,7 +412,7 @@ FetchUnit::FetchBufDesc::nextFetchAddr()
         if (restartFromBranch) {
             restartFromBranch = false;
             int byte_offset
-                = wavefront->pc() - makeLineAddress(wavefront->pc(),
+                = wavefront->pc() - ruby::makeLineAddress(wavefront->pc(),
                                     cacheLineBits);
             readPtr += byte_offset;
         }
@@ -639,3 +642,5 @@ FetchUnit::FetchBufDesc::fetchBytesRemaining() const
     assert(bytes_remaining <= bufferedBytes());
     return bytes_remaining;
 }
+
+} // namespace gem5

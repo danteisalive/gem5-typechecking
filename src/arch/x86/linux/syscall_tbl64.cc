@@ -32,6 +32,9 @@
 #include "arch/x86/linux/syscalls.hh"
 #include "sim/syscall_emul.hh"
 
+namespace gem5
+{
+
 namespace X86ISA
 {
 
@@ -60,7 +63,7 @@ SyscallDescTable<EmuLinux::SyscallABI64> EmuLinux::syscallDescs64 = {
     {  21, "access", ignoreFunc },
     {  22, "pipe", pipeFunc },
     {  23, "select", selectFunc<X86Linux64> },
-    {  24, "sched_yield", ignoreFunc },
+    {  24, "sched_yield", ignoreWarnOnceFunc },
     {  25, "mremap", mremapFunc<X86Linux64> },
     {  26, "msync" },
     {  27, "mincore" },
@@ -111,7 +114,7 @@ SyscallDescTable<EmuLinux::SyscallABI64> EmuLinux::syscallDescs64 = {
     {  72, "fcntl", fcntlFunc },
     {  73, "flock" },
     {  74, "fsync" },
-    {  75, "fdatasync" },
+    {  75, "fdatasync", ignoreFunc },
     {  76, "truncate", truncateFunc },
     {  77, "ftruncate", ftruncateFunc },
 #if defined(SYS_getdents)
@@ -171,7 +174,7 @@ SyscallDescTable<EmuLinux::SyscallABI64> EmuLinux::syscallDescs64 = {
     { 128, "rt_sigtimedwait" },
     { 129, "rt_sigqueueinfo" },
     { 130, "rt_sigsuspend" },
-    { 131, "sigaltstack" },
+    { 131, "sigaltstack", ignoreFunc },
     { 132, "utime" },
     { 133, "mknod", mknodFunc },
     { 134, "uselib" },
@@ -197,7 +200,7 @@ SyscallDescTable<EmuLinux::SyscallABI64> EmuLinux::syscallDescs64 = {
     { 154, "modify_ldt" },
     { 155, "pivot_root" },
     { 156, "_sysctl" },
-    { 157, "prctl" },
+    { 157, "prctl", ignoreFunc },
     { 158, "arch_prctl", archPrctlFunc },
     { 159, "adjtimex" },
     { 160, "setrlimit", ignoreFunc },
@@ -244,7 +247,7 @@ SyscallDescTable<EmuLinux::SyscallABI64> EmuLinux::syscallDescs64 = {
     { 201, "time", timeFunc<X86Linux64> },
     { 202, "futex", futexFunc<X86Linux64> },
     { 203, "sched_setaffinity", ignoreFunc },
-    { 204, "sched_getaffinity", ignoreFunc },
+    { 204, "sched_getaffinity", schedGetaffinityFunc<X86Linux64> },
     { 205, "set_thread_area" },
     { 206, "io_setup" },
     { 207, "io_destroy" },
@@ -257,7 +260,11 @@ SyscallDescTable<EmuLinux::SyscallABI64> EmuLinux::syscallDescs64 = {
     { 214, "epoll_ctl_old" },
     { 215, "epoll_wait_old" },
     { 216, "remap_file_pages" },
+#if defined(SYS_getdents64)
+    { 217, "getdents64", getdents64Func },
+#else
     { 217, "getdents64" },
+#endif
     { 218, "set_tid_address", setTidAddressFunc },
     { 219, "restart_syscall" },
     { 220, "semtimedop" },
@@ -277,7 +284,7 @@ SyscallDescTable<EmuLinux::SyscallABI64> EmuLinux::syscallDescs64 = {
     { 234, "tgkill", tgkillFunc<X86Linux64> },
     { 235, "utimes" },
     { 236, "vserver" },
-    { 237, "mbind" },
+    { 237, "mbind", ignoreFunc },
     { 238, "set_mempolicy" },
     { 239, "get_mempolicy", ignoreFunc },
     { 240, "mq_open" },
@@ -357,3 +364,4 @@ SyscallDescTable<EmuLinux::SyscallABI64> EmuLinux::syscallDescs64 = {
 };
 
 } // namespace X86ISA
+} // namespace gem5

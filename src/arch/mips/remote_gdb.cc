@@ -136,6 +136,9 @@
 #include <string>
 
 #include "arch/mips/decoder.hh"
+#include "arch/mips/regs/float.hh"
+#include "arch/mips/regs/int.hh"
+#include "arch/mips/regs/misc.hh"
 #include "blobs/gdb_xml_mips.hh"
 #include "cpu/thread_state.hh"
 #include "debug/GDBAcc.hh"
@@ -143,10 +146,13 @@
 #include "mem/page_table.hh"
 #include "sim/full_system.hh"
 
+namespace gem5
+{
+
 using namespace MipsISA;
 
-RemoteGDB::RemoteGDB(System *_system, ThreadContext *tc, int _port)
-    : BaseRemoteGDB(_system, tc, _port), regCache(this)
+RemoteGDB::RemoteGDB(System *_system, int _port)
+    : BaseRemoteGDB(_system, _port), regCache(this)
 {
 }
 
@@ -218,3 +224,5 @@ RemoteGDB::getXferFeaturesRead(const std::string &annex, std::string &output)
     output = it->second;
     return true;
 }
+
+} // namespace gem5

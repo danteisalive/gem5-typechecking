@@ -37,6 +37,9 @@
 #include "base/logging.hh"
 #include "base/types.hh"
 
+namespace gem5
+{
+
 /**
  * A trie is a tree-based data structure used for data retrieval. It uses
  * bits masked from the msb of the key to to determine a value's location,
@@ -166,7 +169,7 @@ class Trie
     extendMask(Key orig)
     {
         // Just in case orig was 0.
-        const Key msb = ULL(1) << (MaxBits - 1);
+        const Key msb = 1ULL << (MaxBits - 1);
         return orig | (orig >> 1) | msb;
     }
 
@@ -392,5 +395,7 @@ class Trie
         head.dump(os, 0);
     }
 };
+
+} // namespace gem5
 
 #endif

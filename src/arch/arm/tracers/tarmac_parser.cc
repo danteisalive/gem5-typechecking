@@ -45,14 +45,16 @@
 
 #include "arch/arm/insts/static_inst.hh"
 #include "arch/arm/mmu.hh"
-#include "config/the_isa.hh"
 #include "cpu/static_inst.hh"
 #include "cpu/thread_context.hh"
 #include "mem/packet.hh"
 #include "mem/port_proxy.hh"
-#include "sim/core.hh"
+#include "sim/cur_tick.hh"
 #include "sim/faults.hh"
 #include "sim/sim_exit.hh"
+
+namespace gem5
+{
 
 using namespace ArmISA;
 
@@ -1294,7 +1296,7 @@ TarmacParserRecord::readMemNoEffect(Addr addr, uint8_t *data, unsigned size,
                  Request::funcRequestorId);
 
     // Translate to physical address
-    Fault fault = mmu->translateAtomic(req, thread, BaseTLB::Read);
+    Fault fault = mmu->translateAtomic(req, thread, BaseMMU::Read);
 
     // Ignore read if the address falls into the ignored range
     if (parent.ignoredAddrRange.contains(addr))
@@ -1367,3 +1369,4 @@ TarmacParserRecord::iSetStateToStr(ISetState isetstate) const
 }
 
 } // namespace Trace
+} // namespace gem5

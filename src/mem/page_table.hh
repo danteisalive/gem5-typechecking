@@ -44,6 +44,9 @@
 #include "mem/request.hh"
 #include "sim/serialize.hh"
 
+namespace gem5
+{
+
 class ThreadContext;
 
 class EmulationPageTable : public Serializable
@@ -89,7 +92,8 @@ class EmulationPageTable : public Serializable
      * bit 2 - cacheable  | uncacheable
      * bit 3 - read-write | read-only
      */
-    enum MappingFlags : uint32_t {
+    enum MappingFlags : uint32_t
+    {
         Clobber     = 1,
         Uncacheable = 4,
         ReadOnly    = 8,
@@ -158,10 +162,18 @@ class EmulationPageTable : public Serializable
      */
     Fault translate(const RequestPtr &req);
 
+    /**
+     * Dump all items in the pTable, to a concatenation of strings of the form
+     *    Addr:Entry;
+     */
+    const std::string externalize() const;
+
     void getMappings(std::vector<std::pair<Addr, Addr>> *addr_mappings);
 
     void serialize(CheckpointOut &cp) const override;
     void unserialize(CheckpointIn &cp) override;
 };
+
+} // namespace gem5
 
 #endif // __MEM_PAGE_TABLE_HH__

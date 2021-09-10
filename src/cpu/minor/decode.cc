@@ -42,7 +42,11 @@
 #include "cpu/minor/pipeline.hh"
 #include "debug/Decode.hh"
 
-namespace Minor
+namespace gem5
+{
+
+GEM5_DEPRECATED_NAMESPACE(Minor, minor);
+namespace minor
 {
 
 Decode::Decode(const std::string &name,
@@ -300,13 +304,13 @@ Decode::getScheduledThread()
     std::vector<ThreadID> priority_list;
 
     switch (cpu.threadPolicy) {
-      case Enums::SingleThreaded:
+      case enums::SingleThreaded:
         priority_list.push_back(0);
         break;
-      case Enums::RoundRobin:
+      case enums::RoundRobin:
         priority_list = cpu.roundRobinPriority(threadPriority);
         break;
-      case Enums::Random:
+      case enums::Random:
         priority_list = cpu.randomPriority();
         break;
       default:
@@ -344,8 +348,9 @@ Decode::minorTrace() const
     else
         (*out.inputWire).reportData(data);
 
-    MINORTRACE("insts=%s\n", data.str());
+    minor::minorTrace("insts=%s\n", data.str());
     inputBuffer[0].minorTrace();
 }
 
-}
+} // namespace minor
+} // namespace gem5

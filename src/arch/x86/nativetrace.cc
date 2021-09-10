@@ -28,13 +28,15 @@
 
 #include "arch/x86/nativetrace.hh"
 
-#include "arch/x86/isa_traits.hh"
 #include "arch/x86/regs/float.hh"
 #include "arch/x86/regs/int.hh"
 #include "cpu/thread_context.hh"
 #include "debug/ExecRegDelta.hh"
 #include "params/X86NativeTrace.hh"
 #include "sim/byteswap.hh"
+
+namespace gem5
+{
 
 namespace Trace {
 
@@ -186,3 +188,4 @@ X86NativeTrace::check(NativeTraceRecord *record)
 }
 
 } // namespace Trace
+} // namespace gem5

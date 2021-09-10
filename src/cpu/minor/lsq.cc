@@ -41,6 +41,7 @@
 #include <sstream>
 
 #include "arch/locked_mem.hh"
+#include "base/compiler.hh"
 #include "base/logging.hh"
 #include "base/trace.hh"
 #include "cpu/minor/exec_context.hh"
@@ -50,13 +51,18 @@
 #include "debug/Activity.hh"
 #include "debug/MinorMem.hh"
 
-namespace Minor
+namespace gem5
+{
+
+GEM5_DEPRECATED_NAMESPACE(Minor, minor);
+namespace minor
 {
 
 LSQ::LSQRequest::LSQRequest(LSQ &port_, MinorDynInstPtr inst_, bool isLoad_,
-    PacketDataPtr data_, uint64_t *res_) :
+        RegIndex zero_reg, PacketDataPtr data_, uint64_t *res_) :
     SenderState(),
     port(port_),
+    zeroReg(zero_reg),
     inst(inst_),
     isLoad(isLoad_),
     data(data_),
@@ -76,8 +82,8 @@ LSQ::LSQRequest::tryToSuppressFault()
 {
     SimpleThread &thread = *port.cpu.threads[inst->id.threadId];
     TheISA::PCState old_pc = thread.pcState();
-    ExecContext context(port.cpu, thread, port.execute, inst);
-    M5_VAR_USED Fault fault = inst->translationFault;
+    ExecContext context(port.cpu, thread, port.execute, inst, zeroReg);
+    GEM5_VAR_USED Fault fault = inst->translationFault;
 
     // Give the instruction a chance to suppress a translation fault
     inst->translationFault = inst->staticInst->initiateAcc(&context, nullptr);
@@ -99,7 +105,7 @@ LSQ::LSQRequest::completeDisabledMemAccess()
     SimpleThread &thread = *port.cpu.threads[inst->id.threadId];
     TheISA::PCState old_pc = thread.pcState();
 
-    ExecContext context(port.cpu, thread, port.execute, inst);
+    ExecContext context(port.cpu, thread, port.execute, inst, zeroReg);
 
     context.setMemAccPredicate(false);
     inst->staticInst->completeAcc(nullptr, &context, inst->traceData);
@@ -266,7 +272,7 @@ LSQ::clearMemBarrier(MinorDynInstPtr inst)
 
 void
 LSQ::SingleDataRequest::finish(const Fault &fault_, const RequestPtr &request_,
-                               ThreadContext *tc, BaseTLB::Mode mode)
+                               ThreadContext *tc, BaseMMU::Mode mode)
 {
     port.numAccessesInDTLB--;
 
@@ -311,7 +317,7 @@ LSQ::SingleDataRequest::startAddrTranslation()
          *  finish/markDelayed on the LSQRequest as it bears the Translation
          *  interface */
         thread->getMMUPtr()->translateTiming(
-            request, thread, this, (isLoad ? BaseTLB::Read : BaseTLB::Write));
+            request, thread, this, (isLoad ? BaseMMU::Read : BaseMMU::Write));
     } else {
         disableMemAccess();
         setState(LSQ::LSQRequest::Complete);
@@ -329,11 +335,11 @@ LSQ::SingleDataRequest::retireResponse(PacketPtr packet_)
 
 void
 LSQ::SplitDataRequest::finish(const Fault &fault_, const RequestPtr &request_,
-                              ThreadContext *tc, BaseTLB::Mode mode)
+                              ThreadContext *tc, BaseMMU::Mode mode)
 {
     port.numAccessesInDTLB--;
 
-    M5_VAR_USED unsigned int expected_fragment_index =
+    GEM5_VAR_USED unsigned int expected_fragment_index =
         numTranslatedFragments;
 
     numInTranslationFragments--;
@@ -388,7 +394,7 @@ LSQ::SplitDataRequest::finish(const Fault &fault_, const RequestPtr &request_,
 
 LSQ::SplitDataRequest::SplitDataRequest(LSQ &port_, MinorDynInstPtr inst_,
     bool isLoad_, PacketDataPtr data_, uint64_t *res_) :
-    LSQRequest(port_, inst_, isLoad_, data_, res_),
+    LSQRequest(port_, inst_, isLoad_, port_.zeroReg, data_, res_),
     translationEvent([this]{ sendNextFragmentToTranslation(); },
                      "translationEvent"),
     numFragments(0),
@@ -474,7 +480,7 @@ LSQ::SplitDataRequest::makeFragmentRequests()
     for (unsigned int fragment_index = 0; fragment_index < numFragments;
          fragment_index++)
     {
-        M5_VAR_USED bool is_last_fragment = false;
+        GEM5_VAR_USED bool is_last_fragment = false;
 
         if (fragment_addr == base_addr) {
             /* First fragment */
@@ -710,7 +716,7 @@ LSQ::SplitDataRequest::sendNextFragmentToTranslation()
 
     thread->getMMUPtr()->translateTiming(
         fragmentRequests[fragment_index], thread, this, (isLoad ?
-        BaseTLB::Read : BaseTLB::Write));
+        BaseMMU::Read : BaseMMU::Write));
 }
 
 bool
@@ -948,7 +954,7 @@ LSQ::StoreBuffer::minorTrace() const
             os << ',';
     }
 
-    MINORTRACE("addr=%s num_unissued_stores=%d\n", os.str(),
+    minor::minorTrace("addr=%s num_unissued_stores=%d\n", os.str(),
         numUnissuedAccesses);
 }
 
@@ -1127,7 +1133,7 @@ LSQ::tryToSendToTransfers(LSQRequestPtr request)
         SimpleThread &thread = *cpu.threads[request->inst->id.threadId];
 
         TheISA::PCState old_pc = thread.pcState();
-        ExecContext context(cpu, thread, execute, request->inst);
+        ExecContext context(cpu, thread, execute, request->inst, zeroReg);
 
         /* Handle LLSC requests and tests */
         if (is_load) {
@@ -1401,10 +1407,12 @@ LSQ::LSQ(std::string name_, std::string dcache_port_name_,
     unsigned int in_memory_system_limit, unsigned int line_width,
     unsigned int requests_queue_size, unsigned int transfers_queue_size,
     unsigned int store_buffer_size,
-    unsigned int store_buffer_cycle_store_limit) :
+    unsigned int store_buffer_cycle_store_limit,
+    RegIndex zero_reg) :
     Named(name_),
     cpu(cpu_),
     execute(execute_),
+    zeroReg(zero_reg),
     dcachePort(dcache_port_name_, *this, cpu_),
     lastMemBarrier(cpu.numThreads, 0),
     state(MemoryRunning),
@@ -1661,7 +1669,7 @@ LSQ::pushFailedRequest(MinorDynInstPtr inst)
 void
 LSQ::minorTrace() const
 {
-    MINORTRACE("state=%s in_tlb_mem=%d/%d stores_in_transfers=%d"
+    minor::minorTrace("state=%s in_tlb_mem=%d/%d stores_in_transfers=%d"
         " lastMemBarrier=%d\n",
         state, numAccessesInDTLB, numAccessesInMemorySystem,
         numStoresInTransfers, lastMemBarrier[0]);
@@ -1790,4 +1798,5 @@ LSQ::threadSnoop(LSQRequestPtr request)
     }
 }
 
-}
+} // namespace minor
+} // namespace gem5

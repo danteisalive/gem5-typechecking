@@ -45,11 +45,14 @@
 
 #include <memory>
 
+#include "arch/arm/regs/misc.hh"
 #include "arch/arm/tracers/tarmac_base.hh"
 #include "base/printable.hh"
-#include "config/the_isa.hh"
 #include "cpu/reg_class.hh"
 #include "cpu/static_inst.hh"
+
+namespace gem5
+{
 
 namespace Trace {
 
@@ -267,5 +270,6 @@ class TarmacTracerRecord : public TarmacBaseRecord
 };
 
 } // namespace Trace
+} // namespace gem5
 
 #endif // __ARCH_ARM_TRACERS_TARMAC_RECORD_HH__

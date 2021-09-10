@@ -50,14 +50,21 @@
 
 #include "cpu/kvm/base.hh"
 #include "debug/Kvm.hh"
+#include "mem/physical.hh"
 #include "params/KvmVM.hh"
 #include "sim/system.hh"
 
-#define EXPECTED_KVM_API_VERSION 12
+namespace gem5
+{
 
-#if EXPECTED_KVM_API_VERSION != KVM_API_VERSION
-#error Unsupported KVM version
-#endif
+namespace
+{
+
+constexpr int ExpectedKvmApiVersion = 12;
+static_assert(KVM_API_VERSION == ExpectedKvmApiVersion,
+        "Unsupported KVM version");
+
+} // anonymous namespace
 
 Kvm *Kvm::instance = NULL;
 
@@ -75,7 +82,7 @@ Kvm::Kvm()
         fatal("KVM: Failed to open /dev/kvm\n");
 
     apiVersion = ioctl(KVM_GET_API_VERSION);
-    if (apiVersion != EXPECTED_KVM_API_VERSION)
+    if (apiVersion != ExpectedKvmApiVersion)
         fatal("KVM: Incompatible API version\n");
 
     vcpuMMapSize = ioctl(KVM_GET_VCPU_MMAP_SIZE);
@@ -349,7 +356,7 @@ void
 KvmVM::delayedStartup()
 {
     assert(system); // set by the system during its construction
-    const std::vector<BackingStoreEntry> &memories(
+    const std::vector<memory::BackingStoreEntry> &memories(
         system->getPhysMem().getBackingStore());
 
     DPRINTF(Kvm, "Mapping %i memory region(s)\n", memories.size());
@@ -585,3 +592,5 @@ KvmVM::ioctl(int request, long p1) const
 
     return ::ioctl(vmFD, request, p1);
 }
+
+} // namespace gem5

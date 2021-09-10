@@ -137,7 +137,7 @@
 
 #include "arch/arm/decoder.hh"
 #include "arch/arm/pagetable.hh"
-#include "arch/arm/registers.hh"
+#include "arch/arm/regs/vec.hh"
 #include "arch/arm/system.hh"
 #include "arch/arm/utility.hh"
 #include "arch/generic/mmu.hh"
@@ -163,6 +163,9 @@
 #include "sim/full_system.hh"
 #include "sim/system.hh"
 
+namespace gem5
+{
+
 using namespace ArmISA;
 
 static bool
@@ -180,12 +183,12 @@ tryTranslate(ThreadContext *tc, Addr addr)
     // Calling translateFunctional invokes a table-walk if required
     // so we should always succeed
     auto *mmu = tc->getMMUPtr();
-    return mmu->translateFunctional(req, tc, BaseTLB::Read) == NoFault ||
-           mmu->translateFunctional(req, tc, BaseTLB::Execute) == NoFault;
+    return mmu->translateFunctional(req, tc, BaseMMU::Read) == NoFault ||
+           mmu->translateFunctional(req, tc, BaseMMU::Execute) == NoFault;
 }
 
-RemoteGDB::RemoteGDB(System *_system, ThreadContext *tc, int _port)
-    : BaseRemoteGDB(_system, tc, _port), regCache32(this), regCache64(this)
+RemoteGDB::RemoteGDB(System *_system, int _port)
+    : BaseRemoteGDB(_system, _port), regCache32(this), regCache64(this)
 {
 }
 
@@ -357,3 +360,5 @@ RemoteGDB::gdbRegs()
     else
         return &regCache32;
 }
+
+} // namespace gem5

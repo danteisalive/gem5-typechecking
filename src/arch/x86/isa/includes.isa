@@ -55,13 +55,13 @@ output header {{
 #include "arch/generic/debugfaults.hh"
 #include "arch/x86/emulenv.hh"
 #include "arch/x86/insts/macroop.hh"
+#include "arch/x86/insts/microdebug.hh"
 #include "arch/x86/insts/microfpop.hh"
 #include "arch/x86/insts/microldstop.hh"
 #include "arch/x86/insts/micromediaop.hh"
 #include "arch/x86/insts/microregop.hh"
+#include "arch/x86/insts/microspecop.hh"
 #include "arch/x86/insts/static_inst.hh"
-#include "arch/x86/isa_traits.hh"
-#include "arch/x86/registers.hh"
 #include "arch/x86/types.hh"
 #include "arch/x86/utility.hh"
 #include "base/logging.hh"
@@ -69,7 +69,14 @@ output header {{
 #include "mem/packet.hh"
 #include "sim/faults.hh"
 
-using X86ISA::InstRegIndex;
+using namespace gem5;
+using X86ISA::GpRegIndex;
+using X86ISA::FpRegIndex;
+using X86ISA::CtrlRegIndex;
+using X86ISA::CrRegIndex;
+using X86ISA::DbgRegIndex;
+using X86ISA::SegRegIndex;
+
 }};
 
 output decoder {{
@@ -79,6 +86,7 @@ output decoder {{
 #include "arch/x86/faults.hh"
 #include "arch/x86/microcode_rom.hh"
 #include "arch/x86/regs/float.hh"
+#include "arch/x86/regs/int.hh"
 #include "arch/x86/regs/misc.hh"
 #include "arch/x86/regs/segment.hh"
 #include "arch/x86/tlb.hh"
@@ -89,12 +97,14 @@ output decoder {{
 #include "mem/packet.hh"
 #include "sim/full_system.hh"
 
+using namespace gem5;
 using namespace X86ISA;
 }};
 
 output exec {{
 #include <cmath>
 #include <limits>
+#include <tuple>
 
 #include "arch/generic/debugfaults.hh"
 #include "arch/x86/cpuid.hh"
@@ -105,6 +115,7 @@ output exec {{
 #include "arch/x86/tlb.hh"
 #include "base/compiler.hh"
 #include "base/condcodes.hh"
+#include "base/logging.hh"
 #include "cpu/base.hh"
 #include "cpu/exetrace.hh"
 #include "debug/X86.hh"
@@ -114,6 +125,7 @@ output exec {{
 #include "sim/pseudo_inst.hh"
 #include "sim/sim_exit.hh"
 
+using namespace gem5;
 using namespace X86ISA;
 }};
 
